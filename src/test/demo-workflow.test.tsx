@@ -48,6 +48,7 @@ describe("FixLens AI - Main Demo Workflow Verification", () => {
         urgency: "High",
         affected: 75,
         priority: priorityPrediction.priority,
+        image: "blob:http://localhost:3000/mock-attached-photo-uuid",
       });
       submittedComplaintId = created.id;
     });
@@ -64,10 +65,13 @@ describe("FixLens AI - Main Demo Workflow Verification", () => {
     expect(myComplaint.title).toBe("Severe water leak flooding lab corridor");
     expect(myComplaint.status).toBe("Submitted");
     expect(myComplaint.reporter).toBe("Kavya Sharma");
+    expect(myComplaint.image).toBe("blob:http://localhost:3000/mock-attached-photo-uuid");
 
     // Step 4: Open the admin demo - verify all complaints visible in admin pool
     const adminComplaints = result.current.complaints;
     expect(adminComplaints.some((c) => c.id === submittedComplaintId)).toBe(true);
+    const adminViewItem = adminComplaints.find((c) => c.id === submittedComplaintId)!;
+    expect(adminViewItem.image).toBe("blob:http://localhost:3000/mock-attached-photo-uuid");
 
     // Step 5: Find the same complaint in the admin queue
     const openComplaints = result.current.complaints.filter(

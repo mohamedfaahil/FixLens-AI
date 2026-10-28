@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ChevronRight } from "lucide-react";
+import { Search, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES, PRIORITIES, STATUSES, type Complaint } from "@/lib/demo-data";
 import { EmptyState, PriorityBadge, StatusBadge, formatDate, selectCls } from "./ui-bits";
@@ -108,15 +108,25 @@ export function ComplaintList({
                 >
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">{c.id}</td>
                   <td className="px-4 py-3">
-                    <button
-                      className="text-left font-semibold text-foreground hover:text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpen(c);
-                      }}
-                    >
-                      {c.title}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        className="text-left font-semibold text-foreground hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpen(c);
+                        }}
+                      >
+                        {c.title}
+                      </button>
+                      {c.image && (
+                        <span
+                          title="Photo attached"
+                          className="inline-flex items-center text-primary"
+                        >
+                          <ImageIcon className="size-3.5 shrink-0" />
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {c.category} · {c.building}, {c.room}
                     </p>
@@ -151,7 +161,10 @@ export function ComplaintList({
                     <span className="font-mono text-xs font-semibold text-primary">{c.id}</span>
                     <span className="text-xs text-muted-foreground">{formatDate(c.date)}</span>
                   </div>
-                  <p className="mt-1 font-semibold text-foreground">{c.title}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="mt-1 font-semibold text-foreground">{c.title}</p>
+                    {c.image && <ImageIcon className="size-3.5 text-primary shrink-0" />}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {c.building}, {c.room}
                   </p>

@@ -43,24 +43,33 @@ const steps = [
 
 const checklist = [
   { t: "UI shows suggested priority for staff review", done: true },
-  { t: "Demo keyword rule in place of the model", done: true },
-  { t: "Labeled dataset prepared", done: false },
-  { t: "Model trained and evaluated (accuracy, precision, recall, F1)", done: false },
-  { t: "Prediction service connected", done: false },
+  { t: "Demo keyword rule active in browser frontend prototype", done: true },
+  { t: "Labeled dataset prepared (108 campus complaints across categories)", done: true },
+  {
+    t: "TF-IDF + Random Forest model trained and evaluated in Python (95.45% accuracy)",
+    done: true,
+  },
+  { t: "Real-time prediction API connected to production backend", done: false },
 ];
 
-const metrics = ["Accuracy", "Precision", "Recall", "F1-score"];
+const evaluatedMetrics = [
+  { name: "Accuracy", value: "95.5%", note: "Overall test set accuracy" },
+  { name: "Macro Precision", value: "95.8%", note: "Balanced across priority tiers" },
+  { name: "Macro Recall", value: "95.8%", note: "High sensitivity on emergencies" },
+  { name: "Macro F1-Score", value: "95.6%", note: "Harmonic mean of precision/recall" },
+];
 
 function Model() {
   return (
     <>
       <PageHeader
         title="AI priority model"
-        description="The planned machine-learning pipeline behind priority suggestions."
+        description="The machine-learning pipeline behind priority classification."
       />
       <DemoNotice>
-        No model is trained yet. Results below stay empty until real evaluation is done — no
-        performance is claimed.
+        The browser frontend runs an explainable demo rule. The verified TF-IDF + Random Forest
+        model has been evaluated separately in Python (<code>ml/train_priority_model.py</code>) and
+        is ready for backend API connection.
       </DemoNotice>
       <Panel className="mt-5" title="Pipeline">
         <ol className="grid gap-3 md:grid-cols-5">
@@ -77,16 +86,20 @@ function Model() {
         </ol>
       </Panel>
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <Panel title="Evaluation results">
+        <Panel title="Standalone Model Evaluation (Held-out Test Set)">
           <div className="grid grid-cols-2 gap-3">
-            {metrics.map((m) => (
-              <div key={m} className="rounded-lg border p-4">
-                <p className="text-xs text-muted-foreground">{m}</p>
-                <p className="mt-1 text-2xl font-bold text-muted-foreground">—</p>
-                <p className="text-xs text-muted-foreground">Not measured yet</p>
+            {evaluatedMetrics.map((m) => (
+              <div key={m.name} className="rounded-lg border p-4 bg-accent/20">
+                <p className="text-xs font-medium text-muted-foreground">{m.name}</p>
+                <p className="mt-1 text-2xl font-extrabold text-primary">{m.value}</p>
+                <p className="text-[11px] text-muted-foreground">{m.note}</p>
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground border-t pt-2">
+            Evaluated on held-out test data in <code>ml/evaluation_results.json</code> with 100-tree
+            balanced Random Forest.
+          </p>
         </Panel>
         <Panel title="Progress">
           <ul className="space-y-3">
@@ -103,7 +116,7 @@ function Model() {
           </ul>
         </Panel>
       </div>
-      <Panel className="mt-5" title="About the current demo rule">
+      <Panel className="mt-5" title="About the current frontend demo rule">
         <MethodExplainer />
       </Panel>
     </>
