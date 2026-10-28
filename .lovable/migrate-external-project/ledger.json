@@ -1,0 +1,30 @@
+[
+  {
+    "capability": "code, pages, design",
+    "source": "archive",
+    "outcome": "migrate",
+    "status": "verified",
+    "next_action": "none"
+  },
+  {
+    "capability": "admin portal + student profile pages (linked but missing in archive)",
+    "source": "archive",
+    "outcome": "rebuilt from existing components",
+    "status": "verified",
+    "next_action": "none"
+  },
+  {
+    "capability": "database, records, users, auth",
+    "source": "in-browser demo store only",
+    "outcome": "none present",
+    "status": "verified",
+    "next_action": "none"
+  },
+  {
+    "capability": "external providers, secrets, webhooks",
+    "source": "none detected",
+    "outcome": "n/a",
+    "status": "verified",
+    "next_action": "none"
+  }
+]
