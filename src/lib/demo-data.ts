@@ -76,6 +76,14 @@ export interface Complaint {
   image?: string | undefined;
   resolutionNote?: string | undefined;
   timeline: TimelineEvent[];
+
+  // ML Prediction Persistence (saved from inference service)
+  predictedPriority?: Priority | undefined;
+  confidence?: number | undefined;
+  classProbabilities?: Record<string, number> | undefined;
+  predictionSource?: string | undefined;
+  isTrainedModel?: boolean | undefined;
+  signals?: string[] | undefined;
 }
 
 export interface Proposal {

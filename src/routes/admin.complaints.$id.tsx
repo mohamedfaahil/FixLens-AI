@@ -48,7 +48,26 @@ function AdminDetail() {
         />
       </>
     );
-  const pred = demoPredictPriority(c);
+  // Use saved ML prediction metadata if present; otherwise fall back to demoPredictPriority
+  const hasSavedPrediction = c.isTrainedModel !== undefined;
+  const pred = hasSavedPrediction
+    ? {
+        priority: c.predictedPriority ?? c.priority,
+        signals: c.signals ?? [],
+        source:
+          c.predictionSource ??
+          (c.isTrainedModel ? "Trained TF-IDF + Random Forest Model" : "Demo Fallback"),
+        confidence: c.confidence,
+        classProbabilities: c.classProbabilities,
+        isTrainedModel: c.isTrainedModel,
+      }
+    : {
+        ...demoPredictPriority(c),
+        source: "Demo Prediction",
+        confidence: undefined,
+        classProbabilities: undefined,
+        isTrainedModel: false,
+      };
 
   const save = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +127,14 @@ function AdminDetail() {
               </Button>
             </form>
           </Panel>
-          <PredictionCard priority={pred.priority} signals={pred.signals} />
+          <PredictionCard
+            priority={pred.priority}
+            signals={pred.signals}
+            source={pred.source}
+            confidence={pred.confidence}
+            classProbabilities={pred.classProbabilities}
+            isTrainedModel={pred.isTrainedModel}
+          />
         </div>
       </div>
     </>

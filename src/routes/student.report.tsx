@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ImagePlus, X, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ImagePlus, X, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
   type Complaint,
   type Priority,
 } from "@/lib/demo-data";
+import { predictComplaintPriority, type MLPredictionResult } from "@/lib/ml-api";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/student/report")({
@@ -69,21 +70,77 @@ function Report() {
     >
   >({});
   const [done, setDone] = useState<Complaint | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
+  const [prediction, setPrediction] = useState<MLPredictionResult>(() => {
+    const init = demoPredictPriority({
+      description: "",
+      category: "",
+      urgency: "Medium",
+      affected: 1,
+    });
+    return {
+      priority: init.priority,
+      signals: ["Provide issue description to view predicted priority"],
+      source: "Demo Heuristic (Form incomplete)",
+      isTrainedModel: false,
+    };
+  });
+
   const set =
     (k: keyof typeof empty) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setF({ ...f, [k]: e.target.value });
 
-  const pred = useMemo(
-    () =>
-      demoPredictPriority({
+  // Debounced real-time priority prediction from Python ML API or fallback
+  useEffect(() => {
+    const desc = f.description.trim();
+    if (desc.length < 5) {
+      const fallback = demoPredictPriority({
         description: f.description,
         category: f.category,
         urgency: f.urgency,
-        affected: Number(f.affected) || 0,
-      }),
-    [f.description, f.category, f.urgency, f.affected],
-  );
+        affected: Number(f.affected) || 1,
+      });
+      setPrediction({
+        priority: fallback.priority,
+        signals: desc.length > 0 ? fallback.signals : ["Provide issue description to view predicted priority"],
+        source: "Demo Heuristic (Form incomplete)",
+        isTrainedModel: false,
+      });
+      return;
+    }
+
+    setIsLoadingPrediction(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await predictComplaintPriority({
+          description: f.description,
+          category: f.category,
+          urgency: f.urgency,
+          affected: Number(f.affected) || 1,
+        });
+        setPrediction(res);
+      } catch {
+        const fallback = demoPredictPriority({
+          description: f.description,
+          category: f.category,
+          urgency: f.urgency,
+          affected: Number(f.affected) || 1,
+        });
+        setPrediction({
+          priority: fallback.priority,
+          signals: fallback.signals,
+          source: "Demo Heuristic (API Offline)",
+          isTrainedModel: false,
+        });
+      } finally {
+        setIsLoadingPrediction(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [f.description, f.category, f.urgency, f.affected]);
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,7 +152,7 @@ function Report() {
     setImg(URL.createObjectURL(file));
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Partial<
       Record<
@@ -132,18 +189,43 @@ function Report() {
       er.affected = "Enter a number between 1 and 5000.";
     setErr(er);
     if (Object.keys(er).length) return;
-    const c = addComplaint({
-      title: f.title.trim(),
-      description: f.description.trim(),
-      category: f.category as Category,
-      building: f.building,
-      room: f.room.trim(),
-      urgency: f.urgency,
-      affected: n,
-      priority: pred.priority,
-      image: img,
-    });
-    setDone(c);
+
+    setIsSubmitting(true);
+    try {
+      // Obtain latest prediction from API (or fallback)
+      let finalPred = prediction;
+      if (!finalPred.isTrainedModel || isLoadingPrediction) {
+        finalPred = await predictComplaintPriority({
+          description: f.description.trim(),
+          category: f.category,
+          urgency: f.urgency,
+          affected: n,
+        });
+        setPrediction(finalPred);
+      }
+
+      const c = addComplaint({
+        title: f.title.trim(),
+        description: f.description.trim(),
+        category: f.category as Category,
+        building: f.building,
+        room: f.room.trim(),
+        urgency: f.urgency, // Student reported urgency preserved separately
+        affected: n,
+        priority: finalPred.priority, // Suggested by trained ML model
+        image: img,
+        // Persist ML prediction metadata in the complaint record
+        predictedPriority: finalPred.priority,
+        confidence: finalPred.confidence,
+        classProbabilities: finalPred.classProbabilities,
+        predictionSource: finalPred.source,
+        isTrainedModel: finalPred.isTrainedModel,
+        signals: finalPred.signals,
+      });
+      setDone(c);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (done)
@@ -152,20 +234,27 @@ function Report() {
         <Panel>
           <div className="text-center">
             <CheckCircle2 className="mx-auto size-12 text-success" />
-            <h1 className="mt-3 text-2xl font-extrabold text-foreground">Demo complaint added</h1>
+            <h1 className="mt-3 text-2xl font-extrabold text-foreground">Complaint submitted</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Reference <span className="font-mono font-semibold text-primary">{done.id}</span> was
-              added to this browser tab only.
+              Reference <span className="font-mono font-semibold text-primary">{done.id}</span> has
+              been recorded.
             </p>
           </div>
           <div className="mt-5">
             <DemoNotice>
-              Nothing was sent to a server or saved to a database. Refreshing the page will remove
-              it.
+              Complaint saved in active session memory. You can track its status in your dashboard.
             </DemoNotice>
           </div>
           <div className="mt-5">
-            <PredictionCard priority={pred.priority} signals={pred.signals} />
+            <PredictionCard
+              priority={done.predictedPriority ?? done.priority}
+              signals={done.signals ?? []}
+              source={done.predictionSource}
+              confidence={done.confidence}
+              classProbabilities={done.classProbabilities}
+              isTrainedModel={done.isTrainedModel}
+              error={done.isTrainedModel ? null : prediction.error}
+            />
           </div>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             <Button asChild>
@@ -283,7 +372,7 @@ function Report() {
               </div>
             </div>
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-foreground">Urgency</legend>
+              <legend className="mb-1.5 text-sm font-medium text-foreground">Urgency (Student Reported)</legend>
               <div className="grid grid-cols-3 gap-2">
                 {PRIORITIES.map((p) => (
                   <label
@@ -330,13 +419,14 @@ function Report() {
               )}
               <FieldError msg={err.image} />
               <p className="mt-1 text-xs text-muted-foreground">
-                Preview only — the image is not uploaded anywhere.
+                Preview only — the image is stored in memory for this session.
               </p>
             </div>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button
                 type="button"
                 variant="outline"
+                disabled={isSubmitting}
                 onClick={() => {
                   setF(empty);
                   setImg(undefined);
@@ -345,16 +435,25 @@ function Report() {
               >
                 Clear
               </Button>
-              <Button type="submit">Submit complaint</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {isSubmitting ? "Predicting & Submitting…" : "Submit complaint"}
+              </Button>
             </div>
           </form>
         </Panel>
         <div className="space-y-5">
           <PredictionCard
-            priority={pred.priority}
-            signals={f.description || f.category ? pred.signals : []}
+            priority={prediction.priority}
+            signals={f.description.length >= 3 || f.category ? prediction.signals : []}
+            source={prediction.source}
+            confidence={prediction.confidence}
+            classProbabilities={prediction.classProbabilities}
+            isLoading={isLoadingPrediction}
+            isTrainedModel={prediction.isTrainedModel}
+            error={prediction.error}
           />
-          <Panel title="How priority will be predicted">
+          <Panel title="How priority is predicted">
             <MethodExplainer />
           </Panel>
         </div>

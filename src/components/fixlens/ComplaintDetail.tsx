@@ -1,10 +1,11 @@
-import { Building2, CalendarDays, Tag, UserRound, Users } from "lucide-react";
+import { Building2, CalendarDays, Tag, UserRound, Users, AlertTriangle } from "lucide-react";
 import type { Complaint } from "@/lib/demo-data";
 import { PriorityBadge, StatusBadge, Timeline, formatDate } from "./ui-bits";
 
 export function ComplaintSummary({ c }: { c: Complaint }) {
   const meta = [
     { icon: Tag, l: "Category", v: c.category },
+    { icon: AlertTriangle, l: "Reported urgency", v: c.urgency },
     { icon: Building2, l: "Location", v: `${c.building}, ${c.room}` },
     { icon: Users, l: "People affected", v: c.affected },
     { icon: UserRound, l: "Reporter", v: c.reporter },
