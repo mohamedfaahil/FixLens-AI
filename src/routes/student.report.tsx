@@ -1,13 +1,33 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { ImagePlus, X, CheckCircle2, Loader2 } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
+import {
+  ImagePlus,
+  X,
+  CheckCircle2,
+  Loader2,
+  AlertTriangle,
+  AlertCircle,
+  MessageSquarePlus,
+  CheckSquare,
+  Square,
+  CornerDownRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DemoNotice, FieldError, PageHeader, Panel, selectCls } from "@/components/fixlens/ui-bits";
+import {
+  DemoNotice,
+  FieldError,
+  PageHeader,
+  Panel,
+  StatusBadge,
+  selectCls,
+} from "@/components/fixlens/ui-bits";
 import { MethodExplainer, PredictionCard } from "@/components/fixlens/PriorityPanel";
 import { useDemoStore } from "@/lib/demo-store";
+import { findPotentialDuplicates } from "@/lib/triage-engine";
 import {
   BUILDINGS,
   CATEGORIES,
@@ -40,9 +60,12 @@ const empty = {
 };
 
 function Report() {
-  const { addComplaint } = useDemoStore();
-  const [f, setF] = useState(empty);
-  const [img, setImg] = useState<string>();
+  const navigate = useNavigate();
+  const { addComplaint, addFollowUp, complaints, currentStudent, reportDraft, setReportDraft } =
+    useDemoStore();
+  const [f, setF] = useState(() => reportDraft || empty);
+  const [img, setImg] = useState<string | undefined>(() => reportDraft?.image);
+  const [isSeparateIncidentConfirmed, setIsSeparateIncidentConfirmed] = useState(false);
   const [err, setErr] = useState<
     Partial<
       Record<
@@ -89,8 +112,11 @@ function Report() {
 
   const set =
     (k: keyof typeof empty) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setF({ ...f, [k]: e.target.value });
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const next = { ...f, [k]: e.target.value };
+      setF(next);
+      setReportDraft(next);
+    };
 
   // Debounced real-time priority prediction from Python ML API or fallback
   useEffect(() => {
@@ -142,6 +168,93 @@ function Report() {
     return () => clearTimeout(timer);
   }, [f.description, f.category, f.urgency, f.affected]);
 
+  // Real-time duplicate detection matching category, building, room and description
+  const duplicates = useMemo(() => {
+    return findPotentialDuplicates(
+      {
+        title: f.title,
+        description: f.description,
+        category: f.category,
+        building: f.building,
+        room: f.room,
+      },
+      complaints,
+      { threshold: 0.5, activeOnly: true, maxResults: 3 },
+    );
+  }, [f.title, f.description, f.category, f.building, f.room, complaints]);
+
+  // Same student repeat detection: active complaint previously reported by this student
+  const sameStudentActiveRepeat = useMemo(() => {
+    return duplicates.find(
+      (d) =>
+        d.complaint.reporter.toLowerCase().trim() ===
+        currentStudent.name.toLowerCase().trim(),
+    );
+  }, [duplicates, currentStudent.name]);
+
+  // Other students' duplicate reports
+  const otherStudentDuplicates = useMemo(() => {
+    return duplicates.filter(
+      (d) =>
+        d.complaint.reporter.toLowerCase().trim() !==
+        currentStudent.name.toLowerCase().trim(),
+    );
+  }, [duplicates, currentStudent.name]);
+
+  // Check if an earlier complaint by the same student was resolved
+  const resolvedSameStudentRepeat = useMemo(() => {
+    if (sameStudentActiveRepeat) return undefined;
+    const resolvedMatches = findPotentialDuplicates(
+      {
+        title: f.title,
+        description: f.description,
+        category: f.category,
+        building: f.building,
+        room: f.room,
+      },
+      complaints,
+      { threshold: 0.5, activeOnly: false, maxResults: 3 },
+    );
+    return resolvedMatches.find(
+      (d) =>
+        d.complaint.status === "Resolved" &&
+        d.complaint.reporter.toLowerCase().trim() ===
+          currentStudent.name.toLowerCase().trim(),
+    );
+  }, [
+    f.title,
+    f.description,
+    f.category,
+    f.building,
+    f.room,
+    complaints,
+    currentStudent.name,
+    sameStudentActiveRepeat,
+  ]);
+
+  const handleAddFollowUp = () => {
+    if (!sameStudentActiveRepeat) return;
+    const note = f.description.trim() || f.title.trim();
+    if (note.length < 5) {
+      setErr({ description: "Please enter your follow-up message (at least 5 characters)." });
+      return;
+    }
+    const updated = addFollowUp(sameStudentActiveRepeat.complaint.id, note);
+    if (updated) {
+      toast.success(
+        `Follow-up added to your existing complaint ${sameStudentActiveRepeat.complaint.id}.`,
+      );
+      setReportDraft(null);
+      setF(empty);
+      setImg(undefined);
+      navigate({
+        to: "/student/complaints/$id",
+        params: { id: sameStudentActiveRepeat.complaint.id },
+        search: { from: "report" },
+      });
+    }
+  };
+
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -149,7 +262,9 @@ function Report() {
       return setErr({ ...err, image: "Please choose an image file." });
     if (file.size > 5 * 1024 * 1024) return setErr({ ...err, image: "Image must be under 5 MB." });
     setErr({ ...err, image: "" });
-    setImg(URL.createObjectURL(file));
+    const url = URL.createObjectURL(file);
+    setImg(url);
+    setReportDraft({ ...f, image: url });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -190,6 +305,14 @@ function Report() {
     setErr(er);
     if (Object.keys(er).length) return;
 
+    if (sameStudentActiveRepeat && !isSeparateIncidentConfirmed) {
+      setErr({
+        description:
+          "You've already reported this issue. Please add a follow-up above, or check 'This is a separate incident' to proceed with a new complaint.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Obtain latest prediction from API (or fallback)
@@ -214,6 +337,9 @@ function Report() {
         affected: n,
         priority: finalPred.priority, // Suggested by trained ML model
         image: img,
+        linkedComplaintId: resolvedSameStudentRepeat
+          ? resolvedSameStudentRepeat.complaint.id
+          : undefined,
         // Persist ML prediction metadata in the complaint record
         predictedPriority: finalPred.priority,
         confidence: finalPred.confidence,
@@ -222,6 +348,8 @@ function Report() {
         isTrainedModel: finalPred.isTrainedModel,
         signals: finalPred.signals,
       });
+      setReportDraft(null);
+      setIsSeparateIncidentConfirmed(false);
       setDone(c);
     } finally {
       setIsSubmitting(false);
@@ -268,6 +396,7 @@ function Report() {
                 setDone(null);
                 setF(empty);
                 setImg(undefined);
+                setReportDraft(null);
               }}
             >
               Report another
@@ -422,6 +551,201 @@ function Report() {
                 Preview only — the image is stored in memory for this session.
               </p>
             </div>
+
+            {/* Same student active repeat submission warning */}
+            {sameStudentActiveRepeat && (
+              <div
+                data-testid="same-student-repeat-warning"
+                className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div>
+                      <h4 className="font-semibold text-foreground">
+                        You've already reported this issue
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        You already have an active complaint for this issue at this location. Rather than
+                        submitting duplicate tickets, you can add your update as a follow-up note to the existing complaint.
+                      </p>
+                    </div>
+
+                    <div className="rounded-md border bg-card p-3 shadow-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-primary">
+                            {sameStudentActiveRepeat.complaint.id}
+                          </span>
+                          <StatusBadge status={sameStudentActiveRepeat.complaint.status} />
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(sameStudentActiveRepeat.similarity * 100)}% match
+                          </span>
+                        </div>
+                        <Link
+                          to="/student/complaints/$id"
+                          params={{ id: sameStudentActiveRepeat.complaint.id }}
+                          search={{ from: "report" }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          View existing complaint &rarr;
+                        </Link>
+                      </div>
+                      <p className="mt-1 text-xs font-medium text-foreground line-clamp-1">
+                        {sameStudentActiveRepeat.complaint.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                        {sameStudentActiveRepeat.complaint.description}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {sameStudentActiveRepeat.complaint.building}
+                        </span>
+                        {sameStudentActiveRepeat.complaint.room
+                          ? `, ${sameStudentActiveRepeat.complaint.room}`
+                          : ""}{" "}
+                        &middot; Reported {sameStudentActiveRepeat.complaint.date}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="default"
+                        onClick={handleAddFollowUp}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <MessageSquarePlus className="size-4" />
+                        Add as Follow-up to Complaint
+                      </Button>
+                      <span className="text-[11px] text-muted-foreground">
+                        Appends your current details to #{sameStudentActiveRepeat.complaint.id}
+                      </span>
+                    </div>
+
+                    <div className="border-t border-amber-500/20 pt-2">
+                      <label className="flex items-start gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                        <input
+                          type="checkbox"
+                          id="separate-incident-toggle"
+                          checked={isSeparateIncidentConfirmed}
+                          onChange={(e) => setIsSeparateIncidentConfirmed(e.target.checked)}
+                          className="mt-0.5 rounded border-muted-foreground"
+                        />
+                        <span>
+                          <strong>Report a Separate Incident:</strong> Check this box if this is genuinely a
+                          different occurrence or new incident at this location.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Resolved issue recurrence notice */}
+            {resolvedSameStudentRepeat && (
+              <div
+                data-testid="resolved-repeat-notice"
+                className="rounded-lg border border-blue-500/40 bg-blue-500/10 p-4 text-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 size-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div>
+                      <h4 className="font-semibold text-foreground">
+                        Previous issue was resolved
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        You previously reported a similar issue ({resolvedSameStudentRepeat.complaint.id}) which was
+                        marked as <strong>Resolved</strong>. Submitting this form will create a new complaint
+                        linked to your earlier ticket for recurrence tracking.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        Earlier report: #{resolvedSameStudentRepeat.complaint.id} &middot; {resolvedSameStudentRepeat.complaint.date}
+                      </span>
+                      <Link
+                        to="/student/complaints/$id"
+                        params={{ id: resolvedSameStudentRepeat.complaint.id }}
+                        search={{ from: "report" }}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        View resolved complaint &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Other student duplicates warning */}
+            {otherStudentDuplicates.length > 0 && (
+              <div
+                data-testid="duplicate-warning"
+                className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning-foreground" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div>
+                      <h4 className="font-semibold text-foreground">
+                        Similar active complaint already reported by another student
+                      </h4>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        A similar issue was found for this location reported by another campus student.
+                        You can view it below, or continue submitting your own report. Independent reports
+                        from multiple students help confirm scope and severity.
+                      </p>
+                    </div>
+                    <ul className="space-y-2 pt-1">
+                      {otherStudentDuplicates.map(({ complaint, similarity }) => (
+                        <li
+                          key={complaint.id}
+                          className="rounded-md border bg-card p-3 shadow-xs"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-primary">
+                                {complaint.id}
+                              </span>
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                {complaint.status}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round(similarity * 100)}% match
+                              </span>
+                            </div>
+                            <Link
+                              to="/student/complaints/$id"
+                              params={{ id: complaint.id }}
+                              search={{ from: "report" }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            >
+                              View existing complaint &rarr;
+                            </Link>
+                          </div>
+                          <p className="mt-1 font-medium text-xs text-foreground line-clamp-1">
+                            {complaint.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                            {complaint.description}
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            <span className="font-medium text-foreground">{complaint.building}</span>
+                            {complaint.room ? `, ${complaint.room}` : ""} &middot; Reported{" "}
+                            {complaint.date}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button
                 type="button"
@@ -431,6 +755,7 @@ function Report() {
                   setF(empty);
                   setImg(undefined);
                   setErr({});
+                  setReportDraft(null);
                 }}
               >
                 Clear

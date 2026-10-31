@@ -60,6 +60,14 @@ export interface TimelineEvent {
   by: string;
 }
 
+export interface FollowUpNote {
+  id: string;
+  date: string;
+  timestamp: string;
+  content: string;
+  by: string;
+}
+
 export interface Complaint {
   id: string;
   title: string;
@@ -76,6 +84,8 @@ export interface Complaint {
   image?: string | undefined;
   resolutionNote?: string | undefined;
   timeline: TimelineEvent[];
+  followUps?: FollowUpNote[] | undefined;
+  linkedComplaintId?: string | undefined;
 
   // ML Prediction Persistence (saved from inference service)
   predictedPriority?: Priority | undefined;
@@ -270,6 +280,83 @@ export const initialComplaints: Complaint[] = [
     date: "2026-10-23",
     reporter: "Vikram S",
     timeline: [ev("Submitted", "2026-10-23", "Complaint received.", "Vikram S")],
+  },
+  {
+    id: "FX-1025",
+    title: "Frequent Wi-Fi disconnections during lab practicals",
+    description: "Students in Lab 3 lose connection to remote servers every 15 minutes.",
+    category: "Internet/Wi-Fi",
+    building: "CS Block",
+    room: "Lab 3, 2nd floor",
+    urgency: "Medium",
+    affected: 35,
+    priority: "Medium",
+    status: "Resolved",
+    date: "2026-10-11",
+    reporter: "Kiran Patel",
+    resolutionNote: "Router firmware updated and access point channel reconfigured.",
+    timeline: [
+      ev("Submitted", "2026-10-11", "Complaint received.", "Kiran Patel"),
+      ev("In Progress", "2026-10-12", "Network admin inspected AP."),
+      ev("Resolved", "2026-10-13", "Firmware updated and channel reconfigured."),
+    ],
+  },
+  {
+    id: "FX-1018",
+    title: "Flickering tube lights near front board",
+    description: "Two tube lights flicker continuously in Room 204, causing headaches during lectures.",
+    category: "Electrical",
+    building: "CS Block",
+    room: "Room 204",
+    urgency: "Medium",
+    affected: 55,
+    priority: "Medium",
+    status: "Resolved",
+    date: "2026-10-05",
+    reporter: "Aditya Roy",
+    resolutionNote: "Replaced ballasts and fluorescent starters.",
+    timeline: [
+      ev("Submitted", "2026-10-05", "Complaint received.", "Aditya Roy"),
+      ev("Resolved", "2026-10-06", "Replaced ballasts and starters."),
+    ],
+  },
+  {
+    id: "FX-1020",
+    title: "Trash cans overflowing after lunch hours",
+    description: "Bins near cafeteria outdoor seating fill up by 2 PM and spill onto pavement.",
+    category: "Cleaning",
+    building: "Cafeteria",
+    room: "Outdoor seating",
+    urgency: "Low",
+    affected: 150,
+    priority: "Low",
+    status: "Resolved",
+    date: "2026-10-08",
+    reporter: "Priya Menon",
+    resolutionNote: "Housekeeping scheduled extra 2 PM clearance round.",
+    timeline: [
+      ev("Submitted", "2026-10-08", "Complaint received.", "Priya Menon"),
+      ev("Resolved", "2026-10-09", "Extra afternoon clearance round added."),
+    ],
+  },
+  {
+    id: "FX-1015",
+    title: "Hostel Wi-Fi router keeps rebooting at night",
+    description: "Block B corridor access point restarts every 30 minutes between 9 PM and midnight.",
+    category: "Internet/Wi-Fi",
+    building: "Boys Hostel",
+    room: "Block B",
+    urgency: "Medium",
+    affected: 60,
+    priority: "Medium",
+    status: "Resolved",
+    date: "2026-10-03",
+    reporter: "Harish Kumar",
+    resolutionNote: "Faulty power adapter replaced.",
+    timeline: [
+      ev("Submitted", "2026-10-03", "Complaint received.", "Harish Kumar"),
+      ev("Resolved", "2026-10-04", "Faulty power adapter replaced."),
+    ],
   },
 ];
 

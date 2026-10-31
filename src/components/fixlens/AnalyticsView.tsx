@@ -16,7 +16,8 @@ import {
   Legend,
 } from "recharts";
 import { useDemoStore } from "@/lib/demo-store";
-import { CATEGORIES, anomalyAlerts, monthlyTrend, recurringIssues } from "@/lib/demo-data";
+import { CATEGORIES, anomalyAlerts, monthlyTrend } from "@/lib/demo-data";
+import { detectRecurringIssues } from "@/lib/triage-engine";
 import { DemoNotice, Panel, PriorityBadge, formatDate, selectCls } from "./ui-bits";
 
 const COLORS = [
@@ -60,7 +61,10 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
     ),
   ).map(([name, value]) => ({ name, value }));
   const trend = monthlyTrend.slice(-Math.max(1, Math.round(Number(range) / 30)));
-  const recurring = recurringIssues.filter((r) => !cat || r.category === cat);
+  const recurring = useMemo(() => {
+    const dynamicRecurring = detectRecurringIssues(complaints);
+    return dynamicRecurring.filter((r) => !cat || r.category === cat);
+  }, [complaints, cat]);
 
   const tip = {
     contentStyle: { borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 },
@@ -196,20 +200,30 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
                 </thead>
                 <tbody>
                   {recurring.map((r) => (
-                    <tr key={r.issue} className="border-t">
+                    <tr key={r.id} className="border-t">
                       <td className="py-2.5 font-medium text-foreground">
                         {r.issue}
                         <p className="text-xs text-muted-foreground">{r.category}</p>
                       </td>
                       <td className="py-2.5 text-muted-foreground">{r.location}</td>
-                      <td className="py-2.5 font-semibold text-foreground">{r.count}</td>
+                      <td className="py-2.5 text-foreground">
+                        <span className="font-semibold">{r.count}</span>
+                        {r.incidentCount < r.count ? (
+                          <span
+                            className="ml-1 text-xs text-muted-foreground"
+                            title={`${r.count} reports across ${r.incidentCount} distinct incidents`}
+                          >
+                            ({r.incidentCount} inc.)
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="py-2.5 text-muted-foreground">{formatDate(r.lastSeen)}</td>
                     </tr>
                   ))}
                   {!recurring.length && (
                     <tr>
                       <td colSpan={4} className="py-6 text-center text-muted-foreground">
-                        No recurring issues for this category.
+                        No recurring issues detected for this category.
                       </td>
                     </tr>
                   )}

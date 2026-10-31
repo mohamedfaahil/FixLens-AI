@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Search, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { Search, ChevronRight, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES, PRIORITIES, STATUSES, type Complaint } from "@/lib/demo-data";
+import { detectRecurringIssues } from "@/lib/triage-engine";
 import { EmptyState, PriorityBadge, StatusBadge, formatDate, selectCls } from "./ui-bits";
 
 export function ComplaintList({
@@ -31,6 +32,17 @@ export function ComplaintList({
       }),
     [complaints, q, cat, st, pr],
   );
+
+  const recurringMap = useMemo(() => {
+    const recurring = detectRecurringIssues(complaints);
+    const map = new Map<string, { count: number; incidents: number }>();
+    for (const r of recurring) {
+      for (const id of r.complaintIds) {
+        map.set(id, { count: r.totalReports, incidents: r.incidentCount });
+      }
+    }
+    return map;
+  }, [complaints]);
 
   return (
     <div>
@@ -127,9 +139,19 @@ export function ComplaintList({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {c.category} · {c.building}, {c.room}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {c.category} · {c.building}, {c.room}
+                      </p>
+                      {recurringMap.has(c.id) && (
+                        <span
+                          title={`Recurring issue: ${recurringMap.get(c.id)!.count} reports (${recurringMap.get(c.id)!.incidents} distinct incidents)`}
+                          className="inline-flex items-center gap-1 rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground"
+                        >
+                          <RotateCcw className="size-2.5" /> Recurring
+                        </span>
+                      )}
+                    </div>
                   </td>
                   {showReporter && (
                     <td className="px-4 py-3 text-muted-foreground">{c.reporter}</td>
@@ -168,9 +190,14 @@ export function ComplaintList({
                   <p className="text-xs text-muted-foreground">
                     {c.building}, {c.room}
                   </p>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <PriorityBadge priority={c.priority} />
                     <StatusBadge status={c.status} />
+                    {recurringMap.has(c.id) && (
+                      <span className="inline-flex items-center gap-1 rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground">
+                        <RotateCcw className="size-2.5" /> Recurring ({recurringMap.get(c.id)!.count})
+                      </span>
+                    )}
                   </div>
                 </button>
               </li>

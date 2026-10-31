@@ -3,7 +3,8 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemoNotice, PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { useDemoStore } from "@/lib/demo-store";
-import { CATEGORIES, PROPOSAL_STATUSES, STATUSES, recurringIssues } from "@/lib/demo-data";
+import { CATEGORIES, PROPOSAL_STATUSES, STATUSES } from "@/lib/demo-data";
+import { detectRecurringIssues } from "@/lib/triage-engine";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin/reports")({
@@ -44,6 +45,7 @@ function Reports() {
   const max = (xs: { n: number }[]) => Math.max(...xs.map((x) => x.n));
   const resolved = complaints.filter((c) => c.status === "Resolved").length;
   const top = [...proposals].sort((a, b) => b.support - a.support).slice(0, 5);
+  const recurring = detectRecurringIssues(complaints);
 
   return (
     <>
@@ -109,14 +111,21 @@ function Reports() {
       </div>
       <Panel className="mt-5" title="Recurring issues to plan for">
         <ul className="divide-y text-sm">
-          {recurringIssues.map((r) => (
-            <li key={r.issue + r.location} className="flex justify-between py-2">
+          {recurring.map((r) => (
+            <li key={r.id} className="flex justify-between py-2">
               <span className="text-foreground">
                 {r.issue} — {r.location}
               </span>
-              <span className="text-muted-foreground">{r.count} reports</span>
+              <span className="text-muted-foreground">
+                {r.count} reports {r.incidentCount < r.count ? `(${r.incidentCount} inc.)` : ""}
+              </span>
             </li>
           ))}
+          {!recurring.length && (
+            <li className="py-4 text-center text-muted-foreground text-sm">
+              No recurring issues detected.
+            </li>
+          )}
         </ul>
       </Panel>
     </>

@@ -4,6 +4,8 @@ import {
   initialProposals,
   DEMO_STUDENT,
   type Complaint,
+  type FollowUpNote,
+  type TimelineEvent,
   type Proposal,
   type ProposalStatus,
   type Status,
@@ -17,6 +19,17 @@ export interface StudentUser {
   phone?: string;
 }
 
+export interface ReportDraft {
+  title: string;
+  description: string;
+  category: string;
+  building: string;
+  room: string;
+  urgency: Priority;
+  affected: string;
+  image?: string | undefined;
+}
+
 // All state lives in browser memory for this tab only. Nothing is sent to a server.
 interface Store {
   complaints: Complaint[];
@@ -24,6 +37,9 @@ interface Store {
   votedIds: string[];
   currentStudent: StudentUser;
   setCurrentStudent: (student: StudentUser) => void;
+  reportDraft: ReportDraft | null;
+  setReportDraft: (draft: ReportDraft | null) => void;
+  addFollowUp: (complaintId: string, content: string) => Complaint | undefined;
   addComplaint: (
     c: Omit<Complaint, "id" | "status" | "date" | "reporter" | "timeline">,
   ) => Complaint;
@@ -45,6 +61,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
   const [votedIds, setVoted] = useState<string[]>([]);
   const [currentStudent, setCurrentStudent] = useState<StudentUser>(DEMO_STUDENT);
+  const [reportDraft, setReportDraft] = useState<ReportDraft | null>(null);
 
   const store: Store = {
     complaints,
@@ -52,11 +69,48 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     votedIds,
     currentStudent,
     setCurrentStudent,
+    reportDraft,
+    setReportDraft,
+    addFollowUp: (complaintId, content) => {
+      const trimmed = content.trim();
+      if (!trimmed) return undefined;
+      const target = complaints.find((c) => c.id === complaintId);
+      if (!target) return undefined;
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const fuId = `FU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const newFollowUp: FollowUpNote = {
+        id: fuId,
+        date: today(),
+        timestamp: timeStr,
+        content: trimmed,
+        by: currentStudent.name,
+      };
+      const newTimelineEvent: TimelineEvent = {
+        status: target.status,
+        date: today(),
+        note: `Follow-up: "${trimmed.slice(0, 80)}${trimmed.length > 80 ? "..." : ""}"`,
+        by: currentStudent.name,
+      };
+      const updated: Complaint = {
+        ...target,
+        followUps: [...(target.followUps || []), newFollowUp],
+        timeline: [...target.timeline, newTimelineEvent],
+      };
+
+      setComplaints((xs) => xs.map((c) => (c.id === complaintId ? updated : c)));
+      return updated;
+    },
     addComplaint: (c) => {
       const numIds = complaints
         .map((x) => Number(x.id.replace(/[^\d]/g, "")))
         .filter((n) => !isNaN(n));
       const n = (numIds.length > 0 ? Math.max(...numIds) : 1000) + 1;
+      const initialNote = c.linkedComplaintId
+        ? `Complaint received (demo). Reopened recurrence linked to ${c.linkedComplaintId}.`
+        : "Complaint received (demo).";
       const item: Complaint = {
         ...c,
         id: `FX-${n}`,
@@ -67,7 +121,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
           {
             status: "Submitted",
             date: today(),
-            note: "Complaint received (demo).",
+            note: initialNote,
             by: currentStudent.name,
           },
         ],
@@ -152,6 +206,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setProposals(initialProposals);
       setVoted([]);
       setCurrentStudent(DEMO_STUDENT);
+      setReportDraft(null);
     },
   };
 
