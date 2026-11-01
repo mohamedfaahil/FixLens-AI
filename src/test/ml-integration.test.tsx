@@ -88,6 +88,44 @@ describe("FixLens AI — ML Integration & Fallback Verification", () => {
     expect(result.source).toContain("Form incomplete");
   });
 
+  it("renders PredictionCard in Empty Form State with neutral guidance and no warning boxes", () => {
+    render(
+      <PredictionCard
+        priority="Low"
+        signals={[]}
+        source="Demo Heuristic (Form incomplete)"
+        isTrainedModel={false}
+        isEmpty={true}
+      />,
+    );
+
+    expect(screen.getByText("AI priority assessment")).toBeDefined();
+    expect(
+      screen.getByText("Enter your complaint details to receive an intelligent priority recommendation."),
+    ).toBeDefined();
+    expect(screen.getByText("Awaiting Details")).toBeDefined();
+
+    // Must NOT contain warnings, errors, or offline fallback notices
+    expect(screen.queryByText(/temporarily unavailable/i)).toBeNull();
+    expect(screen.queryByText(/fallback/i)).toBeNull();
+    expect(screen.queryByText(/offline/i)).toBeNull();
+  });
+
+  it("renders PredictionCard in Analyzing State with subtle loading message and no warning colors", () => {
+    render(
+      <PredictionCard
+        priority="Medium"
+        signals={[]}
+        isLoading={true}
+        isTrainedModel={false}
+      />,
+    );
+
+    expect(screen.getAllByText("Analyzing complaint details...").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/temporarily unavailable/i)).toBeNull();
+    expect(screen.queryByText(/offline/i)).toBeNull();
+  });
+
   it("renders PredictionCard correctly with Trained ML Model badge", () => {
     render(
       <PredictionCard
@@ -108,9 +146,10 @@ describe("FixLens AI — ML Integration & Fallback Verification", () => {
         "Powered by trained campus Random Forest classification model. Priority is reviewed and confirmed during administrative triage.",
       ),
     ).toBeDefined();
+    expect(screen.queryByText(/temporarily unavailable/i)).toBeNull();
   });
 
-  it("renders PredictionCard correctly with Preliminary Recommendation and friendly message when API is offline", () => {
+  it("renders PredictionCard correctly when ML service is genuinely unavailable with neutral professional notice", () => {
     render(
       <PredictionCard
         priority="Medium"
@@ -121,11 +160,11 @@ describe("FixLens AI — ML Integration & Fallback Verification", () => {
       />,
     );
 
-    // Should display friendly user-facing badge and message
+    // Should display professional neutral badge and message
     expect(screen.getByText("Preliminary Recommendation")).toBeDefined();
     expect(
       screen.getByText(
-        "AI assessment temporarily unavailable. A preliminary priority recommendation is shown for review.",
+        "AI assessment is temporarily unavailable. A preliminary recommendation is provided for administrative review.",
       ),
     ).toBeDefined();
 

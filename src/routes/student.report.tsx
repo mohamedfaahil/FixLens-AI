@@ -788,6 +788,7 @@ function Report() {
             isTrainedModel={prediction.isTrainedModel}
             error={prediction.error}
             urgency={f.urgency}
+            isEmpty={f.description.trim().length === 0}
           />
           <Panel title="How priority is predicted">
             <MethodExplainer />
