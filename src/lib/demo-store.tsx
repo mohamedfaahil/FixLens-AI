@@ -130,16 +130,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         setVoted(remoteVotes);
         setIsSupabaseConnected(true);
       } else {
-        // Unauthenticated demo / offline fallback
-        if (remoteComplaints && remoteComplaints.length > 0) {
-          setComplaints(remoteComplaints);
-        }
-        if (remoteProposals && remoteProposals.length > 0) {
-          setProposals(remoteProposals);
-        }
-        if (remoteVotes && remoteVotes.length > 0) {
-          setVoted(remoteVotes);
-        }
+        // Unauthenticated demo / offline fallback: clear stale user session data and restore demo baseline
+        setComplaints(remoteComplaints && remoteComplaints.length > 0 ? remoteComplaints : initialComplaints);
+        setProposals(remoteProposals && remoteProposals.length > 0 ? remoteProposals : initialProposals);
+        setVoted(remoteVotes && remoteVotes.length > 0 ? remoteVotes : []);
         setIsSupabaseConnected(false);
       }
     } catch (err) {
@@ -336,9 +330,12 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
 
       // Asynchronously persist to Supabase
       if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
-        createProposalInSupabase(p, currentStudent)
+        createProposalInSupabase({ ...p, id: item.id }, currentStudent)
           .then((persisted) => {
             setProposals((xs) => xs.map((prop) => (prop.id === item.id ? persisted : prop)));
+            if (persisted.id !== item.id) {
+              setVoted((v) => v.map((vid) => (vid === item.id ? persisted.id : vid)));
+            }
           })
           .catch((err) => {
             logStoreNotice("[Demo Store] Proposal create Supabase sync notice:", err);

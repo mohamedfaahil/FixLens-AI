@@ -25,7 +25,7 @@ import { DemoNotice, EmptyState, FieldError, StatusBadge, formatDate, selectCls 
 import { cn } from "@/lib/utils";
 
 export function VoteButton({ p }: { p: Proposal }) {
-  const { vote, votedIds } = useDemoStore();
+  const { vote, votedIds, isSupabaseConnected } = useDemoStore();
   const voted = votedIds.includes(p.id);
   const closed = p.status === "Rejected" || p.status === "Completed";
   return (
@@ -33,7 +33,13 @@ export function VoteButton({ p }: { p: Proposal }) {
       disabled={voted || closed}
       onClick={(e) => {
         e.stopPropagation();
-        if (vote(p.id)) toast.success("Support recorded locally for this demo session.");
+        if (vote(p.id)) {
+          toast.success(
+            isSupabaseConnected
+              ? "Your support has been recorded."
+              : "Support recorded locally for this demo session.",
+          );
+        }
       }}
       aria-label={voted ? "You supported this proposal" : "Support this proposal"}
       className={cn(
@@ -51,7 +57,7 @@ export function VoteButton({ p }: { p: Proposal }) {
 }
 
 export function ProposalBoard() {
-  const { proposals, addProposal } = useDemoStore();
+  const { proposals, addProposal, isSupabaseConnected } = useDemoStore();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [loc, setLoc] = useState("");
@@ -76,10 +82,12 @@ export function ProposalBoard() {
 
   return (
     <div className="space-y-5">
-      <DemoNotice>
-        Votes are stored only in this browser tab. Support shows interest — it does not
-        automatically approve a proposal.
-      </DemoNotice>
+      {!isSupabaseConnected && (
+        <DemoNotice>
+          Votes are stored only in this browser tab. Support shows interest — it does not
+          automatically approve a proposal.
+        </DemoNotice>
+      )}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_150px_auto]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -294,7 +302,7 @@ function CreateProposal({
         <DialogHeader>
           <DialogTitle>Create improvement proposal</DialogTitle>
           <DialogDescription>
-            Suggest an upgrade for campus facilities. Demo only — stored in this tab.
+            Suggest an upgrade for campus facilities to gather student community support.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>

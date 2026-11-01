@@ -377,6 +377,29 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
       expect(insertMock).toHaveBeenCalled();
     });
 
+    it("preserves explicit proposal id when provided", async () => {
+      const insertMock = vi.fn().mockResolvedValue({ error: null });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: insertMock,
+      } as any);
+
+      const proposal = await createProposalInSupabase(
+        {
+          id: "IP-205",
+          title: "Install solar chargers in courtyard",
+          description: "Solar charging bench for student laptops.",
+          category: "Electrical",
+          location: "Central Courtyard",
+        },
+        { id: "student-uuid-1234", name: "Test Student" },
+      );
+
+      expect(proposal.id).toBe("IP-205");
+      expect(insertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "IP-205" }),
+      );
+    });
+
     it("records a proposal vote in public.proposal_votes", async () => {
       const insertMock = vi.fn().mockResolvedValue({ error: null });
       vi.spyOn(supabase, "from").mockReturnValue({

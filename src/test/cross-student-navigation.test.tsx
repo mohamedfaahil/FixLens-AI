@@ -226,4 +226,36 @@ describe("FixLens AI — Cross-Student Navigation & Access Control", () => {
     });
     expect(result.current.reportDraft).toBeNull();
   });
+
+  it("resets store and clears user votes, custom proposals, and complaints upon resetDemoData", () => {
+    const { result } = renderHook(() => useDemoStore(), { wrapper: WrapperComponent });
+
+    // Add a custom proposal and vote for it
+    act(() => {
+      result.current.addProposal({
+        title: "Install bicycle racks outside cafeteria",
+        description: "Covered bicycle racks with security cameras.",
+        category: "Other",
+        location: "Cafeteria",
+      });
+    });
+
+    expect(result.current.votedIds.length).toBeGreaterThan(0);
+    const addedProposal = result.current.proposals.find(
+      (p) => p.title === "Install bicycle racks outside cafeteria",
+    );
+    expect(addedProposal).toBeDefined();
+
+    // Reset demo store (simulates signing out / resetting session)
+    act(() => {
+      result.current.resetDemoData();
+    });
+
+    expect(result.current.votedIds).toEqual([]);
+    expect(result.current.reportDraft).toBeNull();
+    expect(result.current.currentStudent.name).toBe("Aisha Rahman");
+    expect(
+      result.current.proposals.find((p) => p.title === "Install bicycle racks outside cafeteria"),
+    ).toBeUndefined();
+  });
 });

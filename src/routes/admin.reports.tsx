@@ -32,7 +32,7 @@ function Bar({ label, value, max }: { label: string; value: number; max: number 
 }
 
 function Reports() {
-  const { complaints, proposals } = useDemoStore();
+  const { complaints, proposals, isSupabaseConnected } = useDemoStore();
   const byCat = CATEGORIES.map((c) => ({
     c,
     n: complaints.filter((x) => x.category === c).length,
@@ -58,7 +58,9 @@ function Reports() {
           </Button>
         }
       />
-      <DemoNotice>Generated from sample demo data in this browser tab.</DemoNotice>
+      {!isSupabaseConnected && (
+        <DemoNotice>Generated from sample demo data in this browser tab.</DemoNotice>
+      )}
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <Panel>
           <p className="text-xs text-muted-foreground">Total complaints</p>

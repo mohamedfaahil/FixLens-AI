@@ -769,11 +769,10 @@ export async function fetchUserVotesFromSupabase(userId: string): Promise<string
  * Inserts a new campus proposal into Supabase and records the author's initial vote.
  */
 export async function createProposalInSupabase(
-  p: Pick<Proposal, "title" | "description" | "category" | "location">,
+  p: Pick<Proposal, "title" | "description" | "category" | "location"> & { id?: string },
   user: { id?: string; name: string },
 ): Promise<Proposal> {
-  const numId = Math.floor(200 + Math.random() * 800);
-  const proposalId = `IP-${numId}`;
+  const proposalId = p.id || `IP-${Math.floor(200 + Math.random() * 800)}`;
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const { error } = await supabase.from("proposals").insert({

@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 import { DemoNotice, PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { DEMO_ADMIN } from "@/lib/demo-data";
+import { ADMIN_ACCOUNT } from "@/lib/supabase-auth";
+import { useDemoStore } from "@/lib/demo-store";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin/profile")({
@@ -18,17 +20,22 @@ const perms = [
 ];
 
 function Profile() {
+  const { isSupabaseConnected } = useDemoStore();
+  const adminName = isSupabaseConnected ? ADMIN_ACCOUNT.name : DEMO_ADMIN.name;
+  const adminEmail = isSupabaseConnected ? ADMIN_ACCOUNT.email : DEMO_ADMIN.email;
+  const adminRole = isSupabaseConnected ? ADMIN_ACCOUNT.role : DEMO_ADMIN.role;
+
   return (
     <>
       <PageHeader title="Profile" description="Your administrator account." />
-      <DemoNotice>This is a sample demo profile.</DemoNotice>
+      {!isSupabaseConnected && <DemoNotice>This is a sample demo profile.</DemoNotice>}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Panel title="Account">
           <dl className="divide-y text-sm">
             {[
-              ["Name", DEMO_ADMIN.name],
-              ["Email", DEMO_ADMIN.email],
-              ["Role", DEMO_ADMIN.role],
+              ["Name", adminName],
+              ["Email", adminEmail],
+              ["Role", adminRole],
             ].map(([k, v]) => (
               <div key={k} className="grid grid-cols-3 gap-4 py-3">
                 <dt className="text-muted-foreground">{k}</dt>

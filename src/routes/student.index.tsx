@@ -75,7 +75,7 @@ function Overview() {
           label="Active proposals"
           value={proposals.filter((p) => p.status === "Under Review").length}
           icon={Lightbulb}
-          hint="Demo data"
+          hint={isSupabaseConnected ? "Live database" : "Demo data"}
         />
       </div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.6fr_1fr]">
