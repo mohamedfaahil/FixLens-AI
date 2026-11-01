@@ -219,4 +219,32 @@ describe("FixLens AI — ML Integration & Fallback Verification", () => {
     expect(fallbackPred.isTrainedModel).toBe(false);
     expect(fallbackPred.source).toBe("Demo Prediction");
   });
+
+  it("handles checkMLServiceHealth for healthy deployed service", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: "healthy",
+        model_loaded: true,
+        algorithm: "TF-IDF + Random Forest Classifier (100 estimators, balanced weights)",
+        supported_classes: ["High", "Low", "Medium"],
+      }),
+    } as Response);
+
+    const health = await checkMLServiceHealth();
+    expect(health.healthy).toBe(true);
+    expect(health.modelLoaded).toBe(true);
+    expect(health.classes).toContain("High");
+    expect(health.algorithm).toContain("Random Forest");
+  });
+
+  it("handles checkMLServiceHealth when service is unreachable", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Connection refused"));
+
+    const health = await checkMLServiceHealth();
+    expect(health.healthy).toBe(false);
+    expect(health.modelLoaded).toBe(false);
+    expect(health.message).toContain("offline");
+  });
 });

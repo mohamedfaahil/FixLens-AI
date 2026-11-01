@@ -14,19 +14,44 @@ from pydantic import BaseModel, Field
 
 # Locate the trained model artifact
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "ml", "priority_model.joblib")
+DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "ml", "priority_model.joblib")
+
+def get_model_path() -> str:
+    """Finds the trained Random Forest model artifact across supported deployment layouts."""
+    env_path = os.environ.get("MODEL_PATH")
+    if env_path and os.path.exists(env_path):
+        return os.path.abspath(env_path)
+
+    candidates = [
+        DEFAULT_MODEL_PATH,
+        os.path.join(os.getcwd(), "ml", "priority_model.joblib"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ml", "priority_model.joblib"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "priority_model.joblib"),
+        os.path.join(os.getcwd(), "priority_model.joblib"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return os.path.abspath(path)
+
+    return DEFAULT_MODEL_PATH
+
+MODEL_PATH = get_model_path()
 
 # Global pipeline reference loaded once at startup
 ml_pipeline = None
 
 def load_model():
-    global ml_pipeline
-    if ml_pipeline is None and os.path.exists(MODEL_PATH):
-        try:
-            ml_pipeline = joblib.load(MODEL_PATH)
-            print(f"[OK] Successfully loaded Random Forest model pipeline from: {MODEL_PATH}")
-        except Exception as e:
-            print(f"[ERROR] Failed to load model pipeline: {e}")
+    global ml_pipeline, MODEL_PATH
+    if ml_pipeline is None:
+        MODEL_PATH = get_model_path()
+        if os.path.exists(MODEL_PATH):
+            try:
+                ml_pipeline = joblib.load(MODEL_PATH)
+                print(f"[OK] Successfully loaded Random Forest model pipeline from: {MODEL_PATH}")
+            except Exception as e:
+                print(f"[ERROR] Failed to load model pipeline from {MODEL_PATH}: {e}")
+        else:
+            print(f"[WARNING] Model file not found at: {MODEL_PATH}")
     return ml_pipeline
 
 @asynccontextmanager
@@ -41,10 +66,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for local frontend dev servers (e.g., ports 3000, 5173, 8080)
+# Configure CORS: allow all web origins (Vercel, localhost, preview domains)
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS") or os.environ.get("CORS_ORIGINS")
+if allowed_origins_env:
+    origins_list = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+else:
+    origins_list = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins_list,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +96,24 @@ class PredictionResponse(BaseModel):
     prediction_source: str
     signals: List[str]
     error: Optional[str] = None
+
+@app.get("/", summary="Root Status")
+def root_status():
+    """Returns service health status and model availability."""
+    pipeline = load_model()
+    is_ready = pipeline is not None
+    return {
+        "status": "online",
+        "service": "FixLens AI Priority Prediction API",
+        "model_loaded": is_ready,
+        "version": "1.0.0",
+        "algorithm": "TF-IDF + Random Forest Classifier (100 estimators, balanced weights)",
+        "endpoints": {
+            "health": "/health",
+            "predict": "/predict-priority",
+            "docs": "/docs",
+        },
+    }
 
 @app.get("/health", summary="Health Check")
 def health_check():
@@ -144,5 +194,7 @@ def predict_priority(req: ComplaintPredictRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    print("[INFO] Starting FixLens AI Prediction Service on http://127.0.0.1:8000")
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    print(f"[INFO] Starting FixLens AI Prediction Service on http://{host}:{port}")
+    uvicorn.run("backend.main:app", host=host, port=port, reload=False)

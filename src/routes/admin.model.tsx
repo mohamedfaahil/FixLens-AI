@@ -110,8 +110,8 @@ function Model() {
         description="The machine-learning pipeline behind priority classification."
       />
       <DemoNotice>
-        The FixLens AI complaint submission form queries the local FastAPI prediction service at{" "}
-        <code>{ML_API_BASE_URL}</code>. When the service is active, predictions are computed in real time by
+        The FixLens AI complaint submission form queries the FastAPI prediction service at{" "}
+        <code>{ML_API_BASE_URL || "configured ML endpoint"}</code>. When the service is active, predictions are computed in real time by
         the trained Random Forest pipeline (<code>ml/priority_model.joblib</code>). If offline, a rule-based
         fallback is used transparently.
       </DemoNotice>
@@ -129,11 +129,15 @@ function Model() {
                   {health.healthy ? "Python ML Service Operational" : "Service Offline / Unreachable"}
                 </span>
                 <Badge variant={health.healthy ? "success" : "demo"}>
-                  {health.healthy ? "Port 8000 Active" : "Using Fallback"}
+                  {health.healthy
+                    ? ML_API_BASE_URL.includes("127.0.0.1") || ML_API_BASE_URL.includes("localhost")
+                      ? "Localhost Active"
+                      : "Production ML Live"
+                    : "Using Fallback"}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Target endpoint: <code>{ML_API_BASE_URL}/predict-priority</code> — {health.message}
+                Target endpoint: <code>{ML_API_BASE_URL ? `${ML_API_BASE_URL}/predict-priority` : "VITE_ML_API_URL/predict-priority"}</code> — {health.message}
               </p>
             </div>
           </div>
@@ -144,14 +148,20 @@ function Model() {
         </div>
 
         {!health.healthy && (
-          <div className="mt-4 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground border">
-            <p className="font-medium text-foreground">How to start the Python ML API service:</p>
-            <pre className="mt-1.5 overflow-x-auto rounded bg-background p-2 font-mono text-[11px] text-foreground">
-              uvicorn backend.main:app --port 8000 --reload
-            </pre>
-            <p className="mt-1 text-[11px]">
-              Or run: <code>python backend/main.py</code>. Once started, click "Recheck API" above to verify.
-            </p>
+          <div className="mt-4 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground border space-y-2">
+            <p className="font-medium text-foreground">How to start or connect the Python ML API service:</p>
+            <div>
+              <p className="text-[11px] font-semibold text-foreground">Local Development:</p>
+              <pre className="mt-1 overflow-x-auto rounded bg-background p-2 font-mono text-[11px] text-foreground">
+                uvicorn backend.main:app --port 8000 --reload
+              </pre>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-foreground">Production (Vercel):</p>
+              <p className="mt-0.5 text-[11px]">
+                Deploy the ML service to Render and set <code>VITE_ML_API_URL</code> in Vercel Project Settings &rarr; Environment Variables (e.g. <code>https://fixlens-ml.onrender.com</code>).
+              </p>
+            </div>
           </div>
         )}
       </Panel>

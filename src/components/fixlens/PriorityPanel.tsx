@@ -1,5 +1,6 @@
 import { BrainCircuit, Info, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import type { Priority } from "@/lib/demo-data";
+import { ML_API_BASE_URL } from "@/lib/ml-api";
 import { Badge } from "@/components/ui/badge";
 import { DemoBadge, PriorityBadge } from "./ui-bits";
 
@@ -110,8 +111,8 @@ export function MethodExplainer() {
         <div>
           <span className="font-semibold text-primary">Trained & Integrated Model Pipeline:</span>{" "}
           Random Forest classifier trained on 108 campus complaints with 95.45% evaluation accuracy
-          (<code>ml/priority_model.joblib</code>). Served locally via FastAPI at{" "}
-          <code>http://127.0.0.1:8000/predict-priority</code> with rule-based demo fallback.
+          (<code>ml/priority_model.joblib</code>). Served via FastAPI at{" "}
+          <code>{ML_API_BASE_URL ? `${ML_API_BASE_URL}/predict-priority` : "VITE_ML_API_URL/predict-priority"}</code> with rule-based demo fallback.
         </div>
       </div>
       <ol className="mt-4 space-y-3">

@@ -10,8 +10,21 @@ export interface MLPredictionResult {
   error?: string | null;
 }
 
-export const ML_API_BASE_URL =
-  (import.meta.env.VITE_ML_API_URL as string) || "http://127.0.0.1:8000";
+/**
+ * Resolves the active ML API base URL.
+ * 1. If VITE_ML_API_URL is configured (in .env or Vercel Environment Variables), use it (trimmed, no trailing slash).
+ * 2. In local development or testing (import.meta.env.DEV), default to local FastAPI server: http://127.0.0.1:8000.
+ * 3. In production, if VITE_ML_API_URL is not set, we do not point to localhost (which fails on client browsers).
+ */
+const configuredEnvUrl = (import.meta.env.VITE_ML_API_URL as string | undefined)?.trim();
+
+export const IS_ML_API_CONFIGURED = Boolean(configuredEnvUrl) || Boolean(import.meta.env.DEV);
+
+export const ML_API_BASE_URL = configuredEnvUrl
+  ? configuredEnvUrl.replace(/\/+$/, "")
+  : import.meta.env.DEV
+    ? "http://127.0.0.1:8000"
+    : "";
 
 /**
  * Checks if the FastAPI Random Forest service is online and healthy.
@@ -23,9 +36,19 @@ export async function checkMLServiceHealth(): Promise<{
   classes?: string[];
   message: string;
 }> {
+  if (!ML_API_BASE_URL) {
+    return {
+      healthy: false,
+      modelLoaded: false,
+      message:
+        "VITE_ML_API_URL not configured. Add your Render service URL in Vercel project environment variables.",
+    };
+  }
+
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    // Allow up to 10 seconds for health check to account for Render free-tier cold-start
+    const timer = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(`${ML_API_BASE_URL}/health`, {
       method: "GET",
       signal: controller.signal,
@@ -52,7 +75,10 @@ export async function checkMLServiceHealth(): Promise<{
     return {
       healthy: false,
       modelLoaded: false,
-      message: err?.name === "AbortError" ? "Health check timed out" : "API service offline",
+      message:
+        err?.name === "AbortError"
+          ? "Health check timed out (service waking up or unreachable)"
+          : `Python ML API service offline or unreachable at ${ML_API_BASE_URL}`,
     };
   }
 }
@@ -81,9 +107,27 @@ export async function predictComplaintPriority(input: {
     };
   }
 
+  // If not configured in production, return fallback with actionable guidance
+  if (!ML_API_BASE_URL) {
+    const fallback = demoPredictPriority(input);
+    const errorMsg =
+      "Python ML API service offline (VITE_ML_API_URL environment variable is not configured on Vercel)";
+    return {
+      priority: fallback.priority,
+      source: "Demo Heuristic (API Offline)",
+      signals: [
+        `API offline: Using rule-based fallback (${errorMsg})`,
+        ...fallback.signals,
+      ],
+      isTrainedModel: false,
+      error: errorMsg,
+    };
+  }
+
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    // Allow up to 12s to accommodate Render free tier spin-up
+    const timer = setTimeout(() => controller.abort(), 12000);
 
     const res = await fetch(`${ML_API_BASE_URL}/predict-priority`, {
       method: "POST",
@@ -119,8 +163,8 @@ export async function predictComplaintPriority(input: {
     const fallback = demoPredictPriority(input);
     const isTimeout = err?.name === "AbortError";
     const errorMsg = isTimeout
-      ? "API inference request timed out (>4s)"
-      : "Python ML API service offline or unreachable at " + ML_API_BASE_URL;
+      ? "API inference request timed out (>12s) — Render service may be waking up from cold start"
+      : `Python ML API service offline or unreachable at ${ML_API_BASE_URL}`;
 
     return {
       priority: fallback.priority,
