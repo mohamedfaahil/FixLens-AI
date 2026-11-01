@@ -782,6 +782,7 @@ function Report() {
             isLoading={isLoadingPrediction}
             isTrainedModel={prediction.isTrainedModel}
             error={prediction.error}
+            urgency={f.urgency}
           />
           <Panel title="How priority is predicted">
             <MethodExplainer />

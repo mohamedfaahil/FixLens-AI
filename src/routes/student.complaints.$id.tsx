@@ -113,6 +113,7 @@ function Detail() {
             confidence={pred.confidence}
             classProbabilities={pred.classProbabilities}
             isTrainedModel={pred.isTrainedModel}
+            urgency={c.urgency}
           />
           <Panel title="About priority prediction">
             <MethodExplainer />

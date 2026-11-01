@@ -114,11 +114,13 @@ export async function predictComplaintPriority(input: {
       "Python ML API service offline (VITE_ML_API_URL environment variable is not configured on Vercel)";
     return {
       priority: fallback.priority,
-      source: "Demo Heuristic (API Offline)",
-      signals: [
-        `API offline: Using rule-based fallback (${errorMsg})`,
-        ...fallback.signals,
-      ],
+      source: "Preliminary Rule-Based Recommendation",
+      signals: fallback.signals.filter(
+        (s) =>
+          !s.toLowerCase().includes("fallback") &&
+          !s.toLowerCase().includes("offline") &&
+          !s.includes("http://"),
+      ),
       isTrainedModel: false,
       error: errorMsg,
     };
@@ -159,20 +161,22 @@ export async function predictComplaintPriority(input: {
       error: null,
     };
   } catch (err: any) {
-    // Graceful fallback to demo heuristic when backend API is offline
+    // Graceful fallback to preliminary heuristic when backend API is offline
     const fallback = demoPredictPriority(input);
     const isTimeout = err?.name === "AbortError";
     const errorMsg = isTimeout
       ? "API inference request timed out (>12s) — Render service may be waking up from cold start"
-      : `Python ML API service offline or unreachable at ${ML_API_BASE_URL}`;
+      : `Python ML API service offline or unreachable at ${ML_API_BASE_URL || "configured URL"}`;
 
     return {
       priority: fallback.priority,
-      source: "Demo Heuristic (API Offline)",
-      signals: [
-        `API offline: Using rule-based fallback (${errorMsg})`,
-        ...fallback.signals,
-      ],
+      source: "Preliminary Rule-Based Recommendation",
+      signals: fallback.signals.filter(
+        (s) =>
+          !s.toLowerCase().includes("fallback") &&
+          !s.toLowerCase().includes("offline") &&
+          !s.includes("http://"),
+      ),
       isTrainedModel: false,
       error: errorMsg,
     };
