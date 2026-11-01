@@ -455,6 +455,39 @@ export async function updateComplaintInSupabase(
     } catch (err) {
       logWarning("[Supabase Data] Timeline append notice:", err);
     }
+
+    // Insert student notification if the complaint belongs to a registered student
+    try {
+      const { data: comp } = await supabase
+        .from("complaints")
+        .select("reporter_id, title")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (comp?.reporter_id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", comp.reporter_id)
+          .maybeSingle();
+
+        if (prof?.email) {
+          await supabase.from("notifications").insert({
+            user_id: comp.reporter_id,
+            recipient_email: prof.email,
+            title: `Complaint ${id} Updated`,
+            message: patch.status
+              ? `Status changed to ${patch.status}.${patch.note ? ` Note: ${patch.note}` : ""}`
+              : `Admin note added: ${patch.note}`,
+            type: "status_update",
+            reference_id: id,
+            is_read: false,
+          });
+        }
+      }
+    } catch (err) {
+      logWarning("[Supabase Data] Notification dispatch notice:", err);
+    }
   }
 }
 
@@ -710,5 +743,16 @@ export async function markNotificationReadInSupabase(id: string): Promise<void> 
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
   } catch (err) {
     logWarning("[Supabase Data] Mark notification error:", err);
+  }
+}
+
+/**
+ * Marks all notifications for a student as read in Supabase.
+ */
+export async function markAllNotificationsReadInSupabase(userId: string): Promise<void> {
+  try {
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId);
+  } catch (err) {
+    logWarning("[Supabase Data] Mark all notifications error:", err);
   }
 }

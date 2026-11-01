@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Search, ChevronRight, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CATEGORIES, PRIORITIES, STATUSES, type Complaint } from "@/lib/demo-data";
+import { useDemoStore } from "@/lib/demo-store";
 import { detectRecurringIssues } from "@/lib/triage-engine";
 import { EmptyState, PriorityBadge, StatusBadge, formatDate, selectCls } from "./ui-bits";
 
@@ -43,6 +44,8 @@ export function ComplaintList({
     }
     return map;
   }, [complaints]);
+
+  const { isSupabaseConnected } = useDemoStore();
 
   return (
     <div>
@@ -92,7 +95,12 @@ export function ComplaintList({
         </select>
       </div>
 
-      {list.length === 0 ? (
+      {complaints.length === 0 ? (
+        <EmptyState
+          title="No complaints found"
+          description="There are currently no maintenance complaints to display."
+        />
+      ) : list.length === 0 ? (
         <EmptyState
           title="No complaints match"
           description="Try changing the search text or filters."
@@ -206,7 +214,7 @@ export function ComplaintList({
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">
-        Showing {list.length} of {complaints.length} demo complaints
+        Showing {list.length} of {complaints.length} {isSupabaseConnected ? "complaints" : "demo complaints"}
       </p>
     </div>
   );

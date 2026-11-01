@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  EmptyState,
   PageHeader,
   Panel,
   StatusBadge,
@@ -32,13 +33,20 @@ function Review() {
         title="Proposal review"
         description="Sorted by student support. Support shows interest; you decide the outcome."
       />
-      <div className="space-y-4">
-        {[...proposals]
-          .sort((a, b) => b.support - a.support)
-          .map((p) => (
-            <ReviewCard key={p.id} p={p} />
-          ))}
-      </div>
+      {proposals.length === 0 ? (
+        <EmptyState
+          title="No proposals submitted"
+          description="There are currently no campus improvement proposals awaiting review."
+        />
+      ) : (
+        <div className="space-y-4">
+          {[...proposals]
+            .sort((a, b) => b.support - a.support)
+            .map((p) => (
+              <ReviewCard key={p.id} p={p} />
+            ))}
+        </div>
+      )}
     </>
   );
 }
@@ -71,7 +79,7 @@ function ReviewCard({ p }: { p: Proposal }) {
           e.preventDefault();
           reviewProposal(p.id, status, note);
           setNote("");
-          toast.success("Proposal updated (demo).");
+          toast.success("Proposal review saved successfully.");
         }}
       >
         <select

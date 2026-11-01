@@ -22,11 +22,16 @@ export const Route = createFileRoute("/admin/queue")({
 const rank: Record<Priority, number> = { High: 3, Medium: 2, Low: 1 };
 
 function Queue() {
-  const { complaints } = useDemoStore();
+  const { complaints, isSupabaseConnected } = useDemoStore();
   const nav = useNavigate();
   const open = complaints
     .filter((c) => !["Resolved", "Rejected"].includes(c.status))
-    .map((c) => ({ c, pred: demoPredictPriority(c) }))
+    .map((c) => ({
+      c,
+      pred: {
+        priority: c.predictedPriority || c.priority || demoPredictPriority(c).priority,
+      },
+    }))
     .sort((a, b) => rank[b.pred.priority] - rank[a.pred.priority] || b.c.affected - a.c.affected);
 
   return (
@@ -35,10 +40,12 @@ function Queue() {
         title="Priority queue"
         description="Open complaints sorted by suggested priority. Staff confirm the final priority."
       />
-      <DemoNotice>
-        Suggestions come from a simple demo rule. The planned TF-IDF + Random Forest model will
-        replace it once trained and evaluated.
-      </DemoNotice>
+      {!isSupabaseConnected && (
+        <DemoNotice>
+          Suggestions come from a simple demo rule. The planned TF-IDF + Random Forest model will
+          replace it once trained and evaluated.
+        </DemoNotice>
+      )}
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         {PRIORITIES.slice()
           .reverse()

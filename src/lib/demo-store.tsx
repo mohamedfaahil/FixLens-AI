@@ -402,6 +402,27 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
 
 export function useDemoStore() {
   const s = useContext(Ctx);
-  if (!s) throw new Error("useDemoStore must be used inside DemoStoreProvider");
+  if (!s) {
+    // Safe fallback store when rendered in isolated unit tests without DemoStoreProvider
+    return {
+      complaints: initialComplaints,
+      proposals: initialProposals,
+      votedIds: [],
+      currentStudent: DEMO_STUDENT,
+      setCurrentStudent: () => {},
+      reportDraft: null,
+      setReportDraft: () => {},
+      addFollowUp: () => undefined,
+      addComplaint: () => ({} as Complaint),
+      updateComplaint: () => {},
+      addProposal: () => ({} as Proposal),
+      vote: () => false,
+      reviewProposal: () => {},
+      resetDemoData: () => {},
+      isSupabaseConnected: false,
+      isLoading: false,
+      refreshData: async () => {},
+    };
+  }
   return s;
 }

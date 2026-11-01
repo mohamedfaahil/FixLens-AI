@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { ComplaintSummary } from "@/components/fixlens/ComplaintDetail";
@@ -21,7 +21,7 @@ function Detail() {
   const { id } = Route.useParams();
   const { from } = Route.useSearch();
   const navigate = useNavigate();
-  const { complaints, currentStudent } = useDemoStore();
+  const { complaints, currentStudent, isLoading } = useDemoStore();
   const c = complaints.find((x) => x.id === id);
 
   const isFromReport = from === "report";
@@ -41,6 +41,17 @@ function Detail() {
       {isFromReport ? "Back to report form" : "Back to list"}
     </Button>
   );
+
+  if (isLoading && !c) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center">
+        <div className="text-center space-y-2">
+          <Loader2 className="mx-auto size-6 animate-spin text-primary" />
+          <p className="text-xs text-muted-foreground">Loading complaint details…</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!c)
     return (

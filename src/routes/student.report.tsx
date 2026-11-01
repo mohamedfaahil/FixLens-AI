@@ -61,7 +61,7 @@ const empty = {
 
 function Report() {
   const navigate = useNavigate();
-  const { addComplaint, addFollowUp, complaints, currentStudent, reportDraft, setReportDraft } =
+  const { addComplaint, addFollowUp, complaints, currentStudent, reportDraft, setReportDraft, isSupabaseConnected } =
     useDemoStore();
   const [f, setF] = useState(() => reportDraft || empty);
   const [img, setImg] = useState<string | undefined>(() => reportDraft?.image);
@@ -368,9 +368,15 @@ function Report() {
             </p>
           </div>
           <div className="mt-5">
-            <DemoNotice>
-              Complaint saved in active session memory. You can track its status in your dashboard.
-            </DemoNotice>
+            {isSupabaseConnected ? (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+                Complaint persisted to Supabase database. You can track its status and follow-ups in your complaints list.
+              </div>
+            ) : (
+              <DemoNotice>
+                Complaint saved in active session memory. You can track its status in your dashboard.
+              </DemoNotice>
+            )}
           </div>
           <div className="mt-5">
             <PredictionCard

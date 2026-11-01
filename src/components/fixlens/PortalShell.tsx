@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { DemoBadge, Logo } from "./ui-bits";
 import { signOutAdmin, signOutStudent } from "@/lib/supabase-auth";
 import { useDemoStore } from "@/lib/demo-store";
+import { NotificationsBell } from "./NotificationsBell";
 import { toast } from "sonner";
 
 export interface NavItem {
@@ -112,6 +113,7 @@ export function PortalShell({ nav, portal, user, children }: Props) {
             <Logo to="/" />
           </span>
           <div className="ml-auto flex items-center gap-3">
+            {portal === "Student" && <NotificationsBell />}
             {isSupabaseConnected ? (
               <>
                 <span className="hidden text-xs text-muted-foreground sm:inline">
@@ -157,6 +159,9 @@ export function PortalShell({ nav, portal, user, children }: Props) {
                   toast.success("Administrator session closed.");
                   navigate({ to: "/admin-login" });
                 } else {
+                  if (typeof sessionStorage !== "undefined") {
+                    sessionStorage.removeItem("fixlens_demo_session");
+                  }
                   await signOutStudent();
                   toast.success("Student session signed out.");
                   navigate({ to: "/login" });

@@ -137,6 +137,9 @@ function Login() {
       const res = await signInStudent(f.email, f.password);
 
       if (res.success && res.user) {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("fixlens_demo_session");
+        }
         setCurrentStudent(res.user);
         toast.success(`Welcome back, ${res.user.name}!`);
         nav({ to: "/student" });
@@ -148,6 +151,9 @@ function Login() {
         f.email.toLowerCase() === DEMO_STUDENT.email.toLowerCase() &&
         (res.error?.includes("Failed to connect") || res.error?.includes("Invalid login credentials") || res.error?.includes("fetch"))
       ) {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem("fixlens_demo_session", "true");
+        }
         setCurrentStudent(DEMO_STUDENT);
         toast.info("Demo mode: signed in successfully. Opening student portal.");
         nav({ to: "/student" });

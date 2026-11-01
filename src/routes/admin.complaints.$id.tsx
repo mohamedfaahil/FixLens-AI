@@ -44,7 +44,7 @@ function AdminDetail() {
         <div className="mb-4">{back}</div>
         <EmptyState
           title="Complaint not found"
-          description="Demo complaints you add disappear after a page refresh."
+          description={`Complaint reference "${id}" was not found.`}
         />
       </>
     );
@@ -73,7 +73,7 @@ function AdminDetail() {
     e.preventDefault();
     updateComplaint(c.id, { status: status || c.status, priority: priority || c.priority, note });
     setNote("");
-    toast.success("Complaint updated (demo).");
+    toast.success("Complaint updated successfully.");
   };
 
   return (
