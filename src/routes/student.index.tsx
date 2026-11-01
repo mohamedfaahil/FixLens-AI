@@ -29,7 +29,12 @@ export const Route = createFileRoute("/student/")({
 function Overview() {
   const { complaints, proposals, currentStudent } = useDemoStore();
   const nav = useNavigate();
-  const mine = complaints.filter((c) => c.reporter === currentStudent.name);
+  const mine = complaints.filter(
+    (c) =>
+      (c.reporterId && currentStudent.id
+        ? c.reporterId === currentStudent.id
+        : c.reporter === currentStudent.name),
+  );
   const open = mine.filter((c) => !["Resolved", "Rejected"].includes(c.status)).length;
   return (
     <>

@@ -17,6 +17,20 @@ export interface AdminAuthState {
   role?: string;
 }
 
+export interface StudentAuthUser {
+  id: string;
+  email: string;
+  name: string;
+  department: string;
+  phone?: string;
+  role: string;
+}
+
+export interface StudentAuthState {
+  isAuthenticated: boolean;
+  user?: StudentAuthUser;
+}
+
 /**
  * Checks if the administrator is currently authenticated.
  * Verifies the live Supabase Auth session token and validates the administrator role.
@@ -184,5 +198,234 @@ export async function signOutAdmin(): Promise<void> {
     await supabase.auth.signOut();
   } catch (err) {
     console.warn("[Supabase Auth] Sign out notice:", err);
+  }
+}
+
+// ====================================================================
+// STUDENT AUTHENTICATION METHODS
+// ====================================================================
+
+/**
+ * Checks if a student is currently authenticated with a live Supabase session.
+ * Fetches user profile metadata (UUID, full name, department, phone).
+ */
+export async function getStudentAuthState(): Promise<StudentAuthState> {
+  if (typeof window === "undefined") {
+    return { isAuthenticated: false };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.user) {
+      return { isAuthenticated: false };
+    }
+
+    const user = data.session.user;
+    if (!user.email) return { isAuthenticated: false };
+
+    // Fetch profile details from public.profiles with abort timeout
+    let profileData: { full_name?: string | null; department?: string | null; phone?: string | null; role?: string } | null = null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, department, phone, role")
+        .eq("id", user.id)
+        .abortSignal(controller.signal)
+        .maybeSingle();
+
+      clearTimeout(timer);
+      profileData = profile;
+    } catch {
+      // offline / demo fallback
+    }
+
+    const derivedName =
+      profileData?.full_name ||
+      user.user_metadata?.full_name ||
+      user.email
+        .split("@")[0]
+        .replace(/[._-]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    return {
+      isAuthenticated: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: derivedName,
+        department: profileData?.department || user.user_metadata?.department || "General",
+        phone: profileData?.phone || user.user_metadata?.phone,
+        role: profileData?.role || (user.app_metadata?.role as string) || "student",
+      },
+    };
+  } catch {
+    return { isAuthenticated: false };
+  }
+}
+
+/**
+ * Signs in a student with campus email and password via Supabase Auth.
+ */
+export async function signInStudent(
+  emailInput: string,
+  passwordInput: string,
+): Promise<{ success: boolean; error?: string; user?: StudentAuthUser }> {
+  const email = emailInput.trim().toLowerCase();
+  const password = passwordInput;
+
+  if (!email) {
+    return { success: false, error: "Please enter your campus email." };
+  }
+  if (!password) {
+    return { success: false, error: "Please enter your password." };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { success: false, error: error.message || "Invalid credentials." };
+    }
+
+    if (!data.session || !data.user) {
+      return { success: false, error: "Authentication failed. No active session established." };
+    }
+
+    const user = data.user;
+    let profileData: { full_name?: string | null; department?: string | null; phone?: string | null; role?: string } | null = null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, department, phone, role")
+        .eq("id", user.id)
+        .abortSignal(controller.signal)
+        .maybeSingle();
+
+      clearTimeout(timer);
+      profileData = profile;
+    } catch {
+      // offline fallback
+    }
+
+    const derivedName =
+      profileData?.full_name ||
+      user.user_metadata?.full_name ||
+      user.email
+        ?.split("@")[0]
+        .replace(/[._-]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()) ||
+      "Student";
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email!,
+        name: derivedName,
+        department: profileData?.department || user.user_metadata?.department || "General",
+        phone: profileData?.phone || user.user_metadata?.phone,
+        role: profileData?.role || "student",
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to connect to authentication server.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Registers a new student account in Supabase Auth.
+ * Triggers the database profile creation in public.profiles.
+ */
+export async function signUpStudent(input: {
+  email: string;
+  password: string;
+  fullName: string;
+  department: string;
+  phone?: string;
+}): Promise<{
+  success: boolean;
+  error?: string;
+  sessionEstablished: boolean;
+  user?: StudentAuthUser;
+}> {
+  const email = input.email.trim().toLowerCase();
+  const password = input.password;
+  const fullName = input.fullName.trim();
+  const department = input.department.trim();
+  const phone = input.phone?.trim();
+
+  if (!email) {
+    return { success: false, sessionEstablished: false, error: "Please enter your campus email." };
+  }
+  if (!password) {
+    return { success: false, sessionEstablished: false, error: "Please enter a password." };
+  }
+  if (!fullName) {
+    return { success: false, sessionEstablished: false, error: "Please enter your full name." };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          department,
+          phone,
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, sessionEstablished: false, error: error.message };
+    }
+
+    if (!data.user) {
+      return {
+        success: false,
+        sessionEstablished: false,
+        error: "Registration failed. No user was returned by authentication provider.",
+      };
+    }
+
+    const sessionEstablished = Boolean(data.session);
+
+    return {
+      success: true,
+      sessionEstablished,
+      user: {
+        id: data.user.id,
+        email: data.user.email || email,
+        name: fullName,
+        department,
+        phone,
+        role: "student",
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to register student account.";
+    return { success: false, sessionEstablished: false, error: message };
+  }
+}
+
+/**
+ * Signs out the student from Supabase and terminates the session.
+ */
+export async function signOutStudent(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.warn("[Supabase Auth] Student sign out notice:", err);
   }
 }

@@ -6,6 +6,7 @@ import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthL
 import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
+import { signInStudent } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/login")({
@@ -55,7 +56,7 @@ function Login() {
     toast.info("Demo student credentials pre-filled.");
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Partial<
       Record<
@@ -89,24 +90,37 @@ function Login() {
     if (Object.keys(er).length) return;
     setBusy(true);
 
-    if (f.email.toLowerCase() === DEMO_STUDENT.email.toLowerCase()) {
-      setCurrentStudent(DEMO_STUDENT);
-    } else {
-      const derivedName = f.email
-        .split("@")[0]
-        .replace(/[._-]/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      setCurrentStudent({
-        name: derivedName,
-        email: f.email,
-        department: "Computer Applications (MCA)",
-      });
-    }
+    try {
+      // 1. Attempt Supabase Auth student sign-in
+      const res = await signInStudent(f.email, f.password);
 
-    setTimeout(() => {
-      toast.info("Demo mode: signed in successfully. Opening student portal.");
-      nav({ to: "/student" });
-    }, 300);
+      if (res.success && res.user) {
+        setCurrentStudent(res.user);
+        toast.success(`Welcome back, ${res.user.name}!`);
+        nav({ to: "/student" });
+        return;
+      }
+
+      // 2. Demo fallback if using sample demo student in offline/test environment
+      if (
+        f.email.toLowerCase() === DEMO_STUDENT.email.toLowerCase() &&
+        (res.error?.includes("Failed to connect") || res.error?.includes("Invalid login credentials") || res.error?.includes("fetch"))
+      ) {
+        setCurrentStudent(DEMO_STUDENT);
+        toast.info("Demo mode: signed in successfully. Opening student portal.");
+        nav({ to: "/student" });
+        return;
+      }
+
+      setErr({ password: res.error || "Invalid campus credentials." });
+      toast.error(res.error || "Authentication failed.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Sign in failed.";
+      setErr({ password: message });
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

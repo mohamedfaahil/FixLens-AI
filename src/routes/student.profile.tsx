@@ -10,7 +10,12 @@ export const Route = createFileRoute("/student/profile")({
 
 function Profile() {
   const { complaints, currentStudent } = useDemoStore();
-  const mine = complaints.filter((c) => c.reporter === currentStudent.name);
+  const mine = complaints.filter(
+    (c) =>
+      (c.reporterId && currentStudent.id
+        ? c.reporterId === currentStudent.id
+        : c.reporter === currentStudent.name),
+  );
   const rows = [
     ["Name", currentStudent.name],
     ["Email", currentStudent.email],

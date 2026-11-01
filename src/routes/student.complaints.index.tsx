@@ -32,7 +32,12 @@ function MyComplaints() {
         }
       />
       <ComplaintList
-        complaints={complaints.filter((c) => c.reporter === currentStudent.name)}
+        complaints={complaints.filter(
+          (c) =>
+            (c.reporterId && currentStudent.id
+              ? c.reporterId === currentStudent.id
+              : c.reporter === currentStudent.name),
+        )}
         onOpen={(c) => nav({ to: "/student/complaints/$id", params: { id: c.id } })}
       />
     </>

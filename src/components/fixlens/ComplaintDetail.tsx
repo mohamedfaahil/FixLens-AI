@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Building2,
   CalendarDays,
@@ -13,6 +14,7 @@ import { Link } from "@tanstack/react-router";
 import type { Complaint } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
 import { getRecurrenceForComplaint } from "@/lib/triage-engine";
+import { resolveSignedImageUrl } from "@/lib/supabase-data";
 import { PriorityBadge, StatusBadge, Timeline, formatDate } from "./ui-bits";
 
 export function ComplaintSummary({
@@ -24,6 +26,27 @@ export function ComplaintSummary({
 }) {
   const { complaints } = useDemoStore();
   const recurrence = getRecurrenceForComplaint(c, complaints);
+
+  const [resolvedImage, setResolvedImage] = useState<string | undefined>(() => {
+    if (!c.image) return undefined;
+    if (
+      c.image.startsWith("http://") ||
+      c.image.startsWith("https://") ||
+      c.image.startsWith("blob:") ||
+      c.image.startsWith("data:")
+    ) {
+      return c.image;
+    }
+    return undefined;
+  });
+
+  useEffect(() => {
+    if (c.image && !resolvedImage) {
+      resolveSignedImageUrl(c.image).then((url) => {
+        if (url) setResolvedImage(url);
+      });
+    }
+  }, [c.image]);
 
   const reporterDisplay = isSharedView ? "Student Reporter (Protected)" : c.reporter;
 
@@ -113,9 +136,9 @@ export function ComplaintSummary({
           </div>
         ))}
       </dl>
-      {c.image && (
+      {(resolvedImage || c.image) && (
         <img
-          src={c.image}
+          src={resolvedImage || c.image}
           alt="Attached by reporter"
           className="max-h-56 rounded-lg border object-cover"
         />

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import {
   initialComplaints,
   initialProposals,
@@ -11,12 +11,27 @@ import {
   type Status,
   type Priority,
 } from "./demo-data";
+import {
+  fetchComplaintsFromSupabase,
+  createComplaintInSupabase,
+  updateComplaintInSupabase,
+  addFollowUpInSupabase,
+  fetchProposalsFromSupabase,
+  createProposalInSupabase,
+  voteProposalInSupabase,
+  reviewProposalInSupabase,
+  fetchUserVotesFromSupabase,
+} from "./supabase-data";
+import { getStudentAuthState, getAdminAuthState } from "./supabase-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface StudentUser {
+  id?: string;
   name: string;
   email: string;
   department: string;
   phone?: string;
+  role?: string;
 }
 
 export interface ReportDraft {
@@ -28,10 +43,10 @@ export interface ReportDraft {
   urgency: Priority;
   affected: string;
   image?: string | undefined;
+  imageFile?: File | undefined;
 }
 
-// All state lives in browser memory for this tab only. Nothing is sent to a server.
-interface Store {
+export interface Store {
   complaints: Complaint[];
   proposals: Proposal[];
   votedIds: string[];
@@ -42,6 +57,7 @@ interface Store {
   addFollowUp: (complaintId: string, content: string) => Complaint | undefined;
   addComplaint: (
     c: Omit<Complaint, "id" | "status" | "date" | "reporter" | "timeline">,
+    imageFile?: File,
   ) => Complaint;
   updateComplaint: (
     id: string,
@@ -51,10 +67,22 @@ interface Store {
   vote: (id: string) => boolean;
   reviewProposal: (id: string, status: ProposalStatus, note: string) => void;
   resetDemoData: () => void;
+  // Supabase synchronization
+  isSupabaseConnected: boolean;
+  isLoading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
 const today = () => new Date().toISOString().slice(0, 10);
+
+const isTestMode =
+  typeof process !== "undefined" &&
+  (process.env.NODE_ENV === "test" || process.env.VITEST === "true");
+
+function logStoreNotice(msg: string, ...args: unknown[]) {
+  if (!isTestMode) console.warn(msg, ...args);
+}
 
 export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
@@ -62,6 +90,72 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [votedIds, setVoted] = useState<string[]>([]);
   const [currentStudent, setCurrentStudent] = useState<StudentUser>(DEMO_STUDENT);
   const [reportDraft, setReportDraft] = useState<ReportDraft | null>(null);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Synchronize with Supabase database
+  const refreshData = async () => {
+    setIsLoading(true);
+    try {
+      const [studentAuth, adminAuth] = await Promise.all([
+        getStudentAuthState(),
+        getAdminAuthState(),
+      ]);
+
+      if (studentAuth.isAuthenticated && studentAuth.user) {
+        setCurrentStudent(studentAuth.user);
+      }
+
+      const activeUserId = studentAuth.user?.id || (adminAuth.isAuthenticated ? undefined : currentStudent.id);
+      const isAdmin = adminAuth.isAuthenticated;
+
+      const [remoteComplaints, remoteProposals, remoteVotes] = await Promise.all([
+        fetchComplaintsFromSupabase({
+          userId: activeUserId,
+          isAdmin,
+        }),
+        fetchProposalsFromSupabase(),
+        activeUserId ? fetchUserVotesFromSupabase(activeUserId) : Promise.resolve([]),
+      ]);
+
+      if (remoteComplaints && remoteComplaints.length > 0) {
+        setComplaints(remoteComplaints);
+      }
+      if (remoteProposals && remoteProposals.length > 0) {
+        setProposals(remoteProposals);
+      }
+      if (remoteVotes && remoteVotes.length > 0) {
+        setVoted(remoteVotes);
+      }
+
+      setIsSupabaseConnected(true);
+    } catch (err) {
+      logStoreNotice("[Demo Store] Supabase sync notice:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+
+    // Listen for auth state changes (login, logout, token refresh)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const studentAuth = await getStudentAuthState();
+        if (studentAuth.isAuthenticated && studentAuth.user) {
+          setCurrentStudent(studentAuth.user);
+        }
+      } else {
+        setCurrentStudent(DEMO_STUDENT);
+      }
+      refreshData();
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   const store: Store = {
     complaints,
@@ -71,6 +165,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     setCurrentStudent,
     reportDraft,
     setReportDraft,
+    isSupabaseConnected,
+    isLoading,
+    refreshData,
+
     addFollowUp: (complaintId, content) => {
       const trimmed = content.trim();
       if (!trimmed) return undefined;
@@ -101,22 +199,34 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       };
 
       setComplaints((xs) => xs.map((c) => (c.id === complaintId ? updated : c)));
+
+      // Asynchronously persist to Supabase
+      if (currentStudent.id) {
+        addFollowUpInSupabase(complaintId, trimmed, currentStudent).catch((err) => {
+          logStoreNotice("[Demo Store] Follow-up Supabase sync notice:", err);
+        });
+      }
+
       return updated;
     },
-    addComplaint: (c) => {
+
+    addComplaint: (c, imageFile) => {
       const numIds = complaints
         .map((x) => Number(x.id.replace(/[^\d]/g, "")))
         .filter((n) => !isNaN(n));
       const n = (numIds.length > 0 ? Math.max(...numIds) : 1000) + 1;
+      const localId = `FX-${n}`;
       const initialNote = c.linkedComplaintId
         ? `Complaint received (demo). Reopened recurrence linked to ${c.linkedComplaintId}.`
         : "Complaint received (demo).";
+
       const item: Complaint = {
         ...c,
-        id: `FX-${n}`,
+        id: localId,
         status: "Submitted",
         date: today(),
         reporter: currentStudent.name,
+        reporterId: currentStudent.id,
         timeline: [
           {
             status: "Submitted",
@@ -126,10 +236,25 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
           },
         ],
       };
+
+      // Optimistic state update
       setComplaints((xs) => [item, ...xs]);
+
+      // Asynchronously persist to Supabase if authenticated
+      if (currentStudent.id) {
+        createComplaintInSupabase(c, currentStudent, imageFile)
+          .then((persisted) => {
+            setComplaints((xs) => xs.map((comp) => (comp.id === localId ? persisted : comp)));
+          })
+          .catch((err) => {
+            logStoreNotice("[Demo Store] Complaint Supabase persist notice:", err);
+          });
+      }
+
       return item;
     },
-    updateComplaint: (id, patch) =>
+
+    updateComplaint: (id, patch) => {
       setComplaints((xs) =>
         xs.map((c) => {
           if (c.id !== id) return c;
@@ -149,7 +274,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
                 status: patch.status!,
                 date: today(),
                 note: trimmedNote || `Status changed to ${patch.status}.`,
-                by: "Admin (demo)",
+                by: "Facilities Team",
               },
             ];
           } else if (trimmedNote) {
@@ -159,13 +284,20 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
                 status: c.status,
                 date: today(),
                 note: trimmedNote,
-                by: "Admin (demo)",
+                by: "Facilities Team",
               },
             ];
           }
           return next;
         }),
-      ),
+      );
+
+      // Asynchronously update in Supabase
+      updateComplaintInSupabase(id, patch).catch((err) => {
+        logStoreNotice("[Demo Store] Complaint update Supabase sync notice:", err);
+      });
+    },
+
     addProposal: (p) => {
       const numIds = proposals
         .map((x) => Number(x.id.replace(/[^\d]/g, "")))
@@ -179,17 +311,40 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         author: currentStudent.name,
         date: today(),
       };
+
       setProposals((xs) => [item, ...xs]);
       setVoted((v) => [...v, item.id]);
+
+      // Asynchronously persist to Supabase
+      if (currentStudent.id) {
+        createProposalInSupabase(p, currentStudent)
+          .then((persisted) => {
+            setProposals((xs) => xs.map((prop) => (prop.id === item.id ? persisted : prop)));
+          })
+          .catch((err) => {
+            logStoreNotice("[Demo Store] Proposal create Supabase sync notice:", err);
+          });
+      }
+
       return item;
     },
+
     vote: (id) => {
       if (votedIds.includes(id)) return false;
       setVoted((v) => [...v, id]);
       setProposals((xs) => xs.map((p) => (p.id === id ? { ...p, support: p.support + 1 } : p)));
+
+      // Asynchronously persist to Supabase
+      if (currentStudent.id) {
+        voteProposalInSupabase(id, currentStudent.id).catch((err) => {
+          logStoreNotice("[Demo Store] Vote Supabase sync notice:", err);
+        });
+      }
+
       return true;
     },
-    reviewProposal: (id, status, note) =>
+
+    reviewProposal: (id, status, note) => {
       setProposals((xs) =>
         xs.map((p) => {
           if (p.id !== id) return p;
@@ -200,7 +355,14 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
             adminNote: trimmedNote || p.adminNote,
           };
         }),
-      ),
+      );
+
+      // Asynchronously update in Supabase
+      reviewProposalInSupabase(id, status, note).catch((err) => {
+        logStoreNotice("[Demo Store] Proposal review Supabase sync notice:", err);
+      });
+    },
+
     resetDemoData: () => {
       setComplaints(initialComplaints);
       setProposals(initialProposals);

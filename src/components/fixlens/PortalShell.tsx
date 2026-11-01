@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DemoBadge, Logo } from "./ui-bits";
-import { signOutAdmin } from "@/lib/supabase-auth";
+import { signOutAdmin, signOutStudent } from "@/lib/supabase-auth";
 import { toast } from "sonner";
 
 export interface NavItem {
@@ -124,12 +124,12 @@ export function PortalShell({ nav, portal, user, children }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {portal === "Administrator" ? "Sign out of Administrator Portal?" : "Sign out of the demo?"}
+              {portal === "Administrator" ? "Sign out of Administrator Portal?" : "Sign out of Student Portal?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {portal === "Administrator"
                 ? "You will be signed out from your Supabase administrator session and returned to the admin login."
-                : "You will return to the homepage. Demo changes are kept until you refresh the page."}
+                : "You will be signed out from your Supabase student session and returned to the login screen."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -141,7 +141,9 @@ export function PortalShell({ nav, portal, user, children }: Props) {
                   toast.success("Administrator session closed.");
                   navigate({ to: "/admin-login" });
                 } else {
-                  navigate({ to: "/" });
+                  await signOutStudent();
+                  toast.success("Student session signed out.");
+                  navigate({ to: "/login" });
                 }
               }}
             >

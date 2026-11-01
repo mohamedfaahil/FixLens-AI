@@ -81,6 +81,7 @@ export interface Complaint {
   status: Status;
   date: string;
   reporter: string;
+  reporterId?: string | undefined;
   image?: string | undefined;
   resolutionNote?: string | undefined;
   timeline: TimelineEvent[];
@@ -122,10 +123,12 @@ const ev = (
 });
 
 export const DEMO_STUDENT = {
+  id: "00000000-0000-0000-0000-000000000001",
   name: "Aisha Rahman",
   email: "aisha.rahman@campus.edu",
   department: "Computer Applications (MCA)",
   phone: "+91 98765 43210",
+  role: "student",
 };
 
 export const DEMO_ADMIN = {

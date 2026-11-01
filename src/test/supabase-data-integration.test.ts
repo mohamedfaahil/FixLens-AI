@@ -1,0 +1,348 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  signUpStudent,
+  signInStudent,
+  signOutStudent,
+  getStudentAuthState,
+} from "@/lib/supabase-auth";
+import {
+  createComplaintInSupabase,
+  updateComplaintInSupabase,
+  addFollowUpInSupabase,
+  createProposalInSupabase,
+  voteProposalInSupabase,
+  reviewProposalInSupabase,
+  resolveSignedImageUrl,
+  uploadComplaintImage,
+  fetchNotificationsFromSupabase,
+  markNotificationReadInSupabase,
+} from "@/lib/supabase-data";
+
+describe("FixLens AI — Supabase Data & Storage Integration", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("Student Authentication", () => {
+    it("handles student registration via supabase.auth.signUp", async () => {
+      const signUpSpy = vi.spyOn(supabase.auth, "signUp").mockResolvedValueOnce({
+        data: {
+          user: {
+            id: "student-uuid-1234",
+            email: "student.test@campus.edu",
+          } as any,
+          session: {
+            access_token: "mock-token",
+            user: { id: "student-uuid-1234" },
+          } as any,
+        },
+        error: null,
+      });
+
+      const res = await signUpStudent({
+        email: "student.test@campus.edu",
+        password: "SecurePassword123!",
+        fullName: "Test Student",
+        department: "Computer Science",
+        phone: "+91 99999 88888",
+      });
+
+      expect(signUpSpy).toHaveBeenCalledWith({
+        email: "student.test@campus.edu",
+        password: "SecurePassword123!",
+        options: {
+          data: {
+            full_name: "Test Student",
+            department: "Computer Science",
+            phone: "+91 99999 88888",
+          },
+        },
+      });
+      expect(res.success).toBe(true);
+      expect(res.sessionEstablished).toBe(true);
+      expect(res.user?.id).toBe("student-uuid-1234");
+      expect(res.user?.name).toBe("Test Student");
+    });
+
+    it("handles student sign-in via supabase.auth.signInWithPassword", async () => {
+      const signInSpy = vi.spyOn(supabase.auth, "signInWithPassword").mockResolvedValueOnce({
+        data: {
+          user: {
+            id: "student-uuid-1234",
+            email: "student.test@campus.edu",
+            user_metadata: { full_name: "Test Student", department: "Computer Science" },
+          } as any,
+          session: {
+            access_token: "mock-token",
+            user: { id: "student-uuid-1234" },
+          } as any,
+        },
+        error: null,
+      });
+
+      // Mock profiles lookup
+      vi.spyOn(supabase, "from").mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            abortSignal: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { full_name: "Test Student", department: "Computer Science", phone: null, role: "student" },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      } as any);
+
+      const res = await signInStudent("student.test@campus.edu", "SecurePassword123!");
+      expect(signInSpy).toHaveBeenCalledWith({
+        email: "student.test@campus.edu",
+        password: "SecurePassword123!",
+      });
+      expect(res.success).toBe(true);
+      expect(res.user?.id).toBe("student-uuid-1234");
+    });
+
+    it("signs out student via supabase.auth.signOut", async () => {
+      const signOutSpy = vi.spyOn(supabase.auth, "signOut").mockResolvedValueOnce({
+        error: null,
+      });
+
+      await signOutStudent();
+      expect(signOutSpy).toHaveBeenCalled();
+    });
+
+    it("resolves student auth state when authenticated", async () => {
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValueOnce({
+        data: {
+          session: {
+            user: {
+              id: "student-uuid-1234",
+              email: "student.test@campus.edu",
+              user_metadata: { full_name: "Test Student", department: "Computer Science" },
+            },
+          } as any,
+        },
+        error: null,
+      });
+
+      vi.spyOn(supabase, "from").mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            abortSignal: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { full_name: "Test Student", department: "Computer Science", phone: null, role: "student" },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      } as any);
+
+      const authState = await getStudentAuthState();
+      expect(authState.isAuthenticated).toBe(true);
+      expect(authState.user?.id).toBe("student-uuid-1234");
+      expect(authState.user?.name).toBe("Test Student");
+    });
+  });
+
+  describe("Complaints Operations", () => {
+    it("creates complaint record with correct columns and reporter UUID", async () => {
+      const insertSpy = vi.fn().mockResolvedValue({ error: null });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: insertSpy,
+      } as any);
+
+      const created = await createComplaintInSupabase(
+        {
+          title: "Broken window in CS Lab 2",
+          description: "Glass crack on the south window.",
+          category: "Other",
+          building: "CS Block",
+          room: "Lab 2",
+          urgency: "Medium",
+          affected: 15,
+          priority: "Medium",
+          image: "https://example.com/test.jpg",
+        },
+        {
+          id: "student-uuid-1234",
+          name: "Test Student",
+        },
+      );
+
+      expect(created.id).toMatch(/^FX-\d+$/);
+      expect(created.reporter).toBe("Test Student");
+      expect(created.status).toBe("Submitted");
+      expect(insertSpy).toHaveBeenCalled();
+    });
+
+    it("updates complaint status and priority for administrative review", async () => {
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        update: updateMock,
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      } as any);
+
+      await expect(
+        updateComplaintInSupabase("FX-1001", {
+          status: "In Progress",
+          priority: "High",
+          note: "Work order dispatched to electrical team.",
+        }),
+      ).resolves.not.toThrow();
+      expect(updateMock).toHaveBeenCalled();
+    });
+
+    it("adds student follow-up message to public.complaint_follow_ups", async () => {
+      const insertMock = vi.fn().mockResolvedValue({ error: null });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: insertMock,
+      } as any);
+
+      const followUp = await addFollowUpInSupabase(
+        "FX-1001",
+        "Water has begun pooling near power outlets.",
+        { id: "student-uuid-1234", name: "Test Student" },
+      );
+
+      expect(followUp.content).toBe("Water has begun pooling near power outlets.");
+      expect(followUp.by).toBe("Test Student");
+      expect(followUp.id).toMatch(/^FU-\d+-\d+$/);
+      expect(insertMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("Proposals and Voting", () => {
+    it("creates a new campus proposal with initial vote", async () => {
+      const insertMock = vi.fn().mockResolvedValue({ error: null });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: insertMock,
+      } as any);
+
+      const proposal = await createProposalInSupabase(
+        {
+          title: "Install water purifier in MCA block",
+          description: "Filtered drinking water station on 2nd floor.",
+          category: "Plumbing",
+          location: "MCA Block, 2nd floor",
+        },
+        { id: "student-uuid-1234", name: "Test Student" },
+      );
+
+      expect(proposal.id).toMatch(/^IP-\d+$/);
+      expect(proposal.support).toBe(1);
+      expect(proposal.status).toBe("Under Review");
+      expect(insertMock).toHaveBeenCalled();
+    });
+
+    it("records a proposal vote in public.proposal_votes", async () => {
+      const insertMock = vi.fn().mockResolvedValue({ error: null });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: insertMock,
+      } as any);
+
+      const success = await voteProposalInSupabase("IP-201", "student-uuid-1234");
+      expect(success).toBe(true);
+      expect(insertMock).toHaveBeenCalled();
+    });
+
+    it("reviews proposal status and admin note", async () => {
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        update: updateMock,
+      } as any);
+
+      await expect(
+        reviewProposalInSupabase("IP-201", "Approved", "Approved for next semester capital plan."),
+      ).resolves.not.toThrow();
+      expect(updateMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("Private Storage & Signed URLs", () => {
+    it("returns direct HTTP and blob URLs without storage call", async () => {
+      const httpUrl = "https://example.com/photo.jpg";
+      const blobUrl = "blob:http://localhost:5173/mock-uuid";
+
+      expect(await resolveSignedImageUrl(httpUrl)).toBe(httpUrl);
+      expect(await resolveSignedImageUrl(blobUrl)).toBe(blobUrl);
+      expect(await resolveSignedImageUrl(null)).toBeUndefined();
+    });
+
+    it("resolves storage object path to signed URL from complaint-images bucket", async () => {
+      vi.spyOn(supabase.storage, "from").mockReturnValue({
+        createSignedUrl: vi.fn().mockResolvedValue({
+          data: { signedUrl: "https://snwcmuptrvmpniuevofj.supabase.co/storage/v1/object/sign/complaint-images/test.jpg?token=abc" },
+          error: null,
+        }),
+      } as any);
+
+      const signed = await resolveSignedImageUrl("user-123/1234567-broken_door.jpg");
+      expect(signed).toContain("snwcmuptrvmpniuevofj.supabase.co");
+      expect(signed).toContain("token=abc");
+    });
+
+    it("uploads complaint image to private complaint-images bucket", async () => {
+      const uploadMock = vi.fn().mockResolvedValue({ data: { path: "user-123/mock.jpg" }, error: null });
+      vi.spyOn(supabase.storage, "from").mockReturnValue({
+        upload: uploadMock,
+      } as any);
+
+      const mockFile = new File(["test image bytes"], "broken_chair.jpg", { type: "image/jpeg" });
+      const path = await uploadComplaintImage("user-123", mockFile);
+
+      expect(path).toMatch(/^user-123\/\d+-broken_chair\.jpg$/);
+      expect(uploadMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("Notifications", () => {
+    it("fetches user notifications from public.notifications", async () => {
+      vi.spyOn(supabase, "from").mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: "notif-1",
+                  user_id: "student-uuid-1234",
+                  recipient_email: "student@campus.edu",
+                  title: "Complaint resolved",
+                  message: "Your complaint FX-1001 has been resolved.",
+                  type: "status_update",
+                  reference_id: "FX-1001",
+                  is_read: false,
+                  created_at: new Date().toISOString(),
+                },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      } as any);
+
+      const notifs = await fetchNotificationsFromSupabase("student-uuid-1234");
+      expect(notifs.length).toBe(1);
+      expect(notifs[0].title).toBe("Complaint resolved");
+      expect(notifs[0].isRead).toBe(false);
+    });
+
+    it("marks notification as read", async () => {
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+      vi.spyOn(supabase, "from").mockReturnValue({
+        update: updateMock,
+      } as any);
+
+      await expect(markNotificationReadInSupabase("notif-1")).resolves.not.toThrow();
+      expect(updateMock).toHaveBeenCalled();
+    });
+  });
+});

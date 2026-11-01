@@ -54,6 +54,7 @@ function Detail() {
     );
 
   const isOwnComplaint =
+    (c.reporterId && currentStudent.id && c.reporterId === currentStudent.id) ||
     c.reporter.toLowerCase().trim() === currentStudent.name.toLowerCase().trim();
   const isSharedView = !isOwnComplaint;
 

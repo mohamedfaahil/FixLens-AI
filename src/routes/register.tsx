@@ -8,6 +8,7 @@ import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { FieldError, selectCls } from "@/components/fixlens/ui-bits";
 import { DEPARTMENTS, DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
+import { signUpStudent } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/register")({
@@ -30,6 +31,7 @@ function Register() {
     password: "",
     confirm: "",
   });
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<
     Partial<
       Record<
@@ -72,7 +74,7 @@ function Register() {
     toast.info("Sample student credentials pre-filled.");
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Partial<
       Record<
@@ -109,14 +111,49 @@ function Register() {
     setErr(er);
     if (Object.keys(er).length) return;
 
-    setCurrentStudent({
-      name: f.name.trim(),
-      email: f.email.trim(),
-      department: f.department,
-      phone: f.phone.trim() || undefined,
-    });
-    toast.success(`Welcome, ${f.name.trim()}! Demo student account created for this session.`);
-    nav({ to: "/student" });
+    setBusy(true);
+    try {
+      const res = await signUpStudent({
+        email: f.email.trim(),
+        password: f.password,
+        fullName: f.name.trim(),
+        department: f.department,
+        phone: f.phone.trim() || undefined,
+      });
+
+      if (res.success && res.user) {
+        if (res.sessionEstablished) {
+          setCurrentStudent(res.user);
+          toast.success(`Welcome, ${res.user.name}! Student account created.`);
+          nav({ to: "/student" });
+        } else {
+          toast.success("Account registered! Please check your email to verify your account or sign in.");
+          nav({ to: "/login" });
+        }
+        return;
+      }
+
+      // Offline / fallback if needed
+      if (res.error?.includes("Failed to connect") || res.error?.includes("fetch")) {
+        setCurrentStudent({
+          name: f.name.trim(),
+          email: f.email.trim(),
+          department: f.department,
+          phone: f.phone.trim() || undefined,
+        });
+        toast.success(`Welcome, ${f.name.trim()}! Demo student account created for this session.`);
+        nav({ to: "/student" });
+        return;
+      }
+
+      setErr({ email: res.error || "Failed to create account." });
+      toast.error(res.error || "Registration failed.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Registration failed.";
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -193,8 +230,8 @@ function Register() {
           error={err.confirm}
           onChange={set("confirm")}
         />
-        <Button type="submit" size="lg" className="w-full">
-          Create account
+        <Button type="submit" size="lg" className="w-full" disabled={busy}>
+          {busy ? "Creating account…" : "Create account"}
         </Button>
       </form>
       <p className="mt-6 text-center text-sm text-muted-foreground">

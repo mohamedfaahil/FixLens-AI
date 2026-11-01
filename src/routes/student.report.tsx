@@ -65,6 +65,7 @@ function Report() {
     useDemoStore();
   const [f, setF] = useState(() => reportDraft || empty);
   const [img, setImg] = useState<string | undefined>(() => reportDraft?.image);
+  const [selectedFile, setSelectedFile] = useState<File | undefined>(() => reportDraft?.imageFile);
   const [isSeparateIncidentConfirmed, setIsSeparateIncidentConfirmed] = useState(false);
   const [err, setErr] = useState<
     Partial<
@@ -183,23 +184,20 @@ function Report() {
     );
   }, [f.title, f.description, f.category, f.building, f.room, complaints]);
 
+  const isSameStudent = (complaintReporter: string, reporterId?: string) => {
+    if (reporterId && currentStudent.id) return reporterId === currentStudent.id;
+    return complaintReporter.toLowerCase().trim() === currentStudent.name.toLowerCase().trim();
+  };
+
   // Same student repeat detection: active complaint previously reported by this student
   const sameStudentActiveRepeat = useMemo(() => {
-    return duplicates.find(
-      (d) =>
-        d.complaint.reporter.toLowerCase().trim() ===
-        currentStudent.name.toLowerCase().trim(),
-    );
-  }, [duplicates, currentStudent.name]);
+    return duplicates.find((d) => isSameStudent(d.complaint.reporter, d.complaint.reporterId));
+  }, [duplicates, currentStudent.name, currentStudent.id]);
 
   // Other students' duplicate reports
   const otherStudentDuplicates = useMemo(() => {
-    return duplicates.filter(
-      (d) =>
-        d.complaint.reporter.toLowerCase().trim() !==
-        currentStudent.name.toLowerCase().trim(),
-    );
-  }, [duplicates, currentStudent.name]);
+    return duplicates.filter((d) => !isSameStudent(d.complaint.reporter, d.complaint.reporterId));
+  }, [duplicates, currentStudent.name, currentStudent.id]);
 
   // Check if an earlier complaint by the same student was resolved
   const resolvedSameStudentRepeat = useMemo(() => {
@@ -218,8 +216,7 @@ function Report() {
     return resolvedMatches.find(
       (d) =>
         d.complaint.status === "Resolved" &&
-        d.complaint.reporter.toLowerCase().trim() ===
-          currentStudent.name.toLowerCase().trim(),
+        isSameStudent(d.complaint.reporter, d.complaint.reporterId),
     );
   }, [
     f.title,
@@ -229,6 +226,7 @@ function Report() {
     f.room,
     complaints,
     currentStudent.name,
+    currentStudent.id,
     sameStudentActiveRepeat,
   ]);
 
@@ -262,9 +260,10 @@ function Report() {
       return setErr({ ...err, image: "Please choose an image file." });
     if (file.size > 5 * 1024 * 1024) return setErr({ ...err, image: "Image must be under 5 MB." });
     setErr({ ...err, image: "" });
+    setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setImg(url);
-    setReportDraft({ ...f, image: url });
+    setReportDraft({ ...f, image: url, imageFile: file });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -347,7 +346,7 @@ function Report() {
         predictionSource: finalPred.source,
         isTrainedModel: finalPred.isTrainedModel,
         signals: finalPred.signals,
-      });
+      }, selectedFile);
       setReportDraft(null);
       setIsSeparateIncidentConfirmed(false);
       setDone(c);
@@ -548,7 +547,7 @@ function Report() {
               )}
               <FieldError msg={err.image} />
               <p className="mt-1 text-xs text-muted-foreground">
-                Preview only — the image is stored in memory for this session.
+                Stored securely in the private complaint-images bucket.
               </p>
             </div>
 
