@@ -5,8 +5,10 @@ import {
   signInStudent,
   signOutStudent,
   getStudentAuthState,
+  resendStudentConfirmationEmail,
 } from "@/lib/supabase-auth";
 import {
+  fetchComplaintsFromSupabase,
   createComplaintInSupabase,
   updateComplaintInSupabase,
   addFollowUpInSupabase,
@@ -52,6 +54,7 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
         email: "student.test@campus.edu",
         password: "SecurePassword123!",
         options: {
+          emailRedirectTo: expect.any(String),
           data: {
             full_name: "Test Student",
             department: "Computer Science",
@@ -63,6 +66,61 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
       expect(res.sessionEstablished).toBe(true);
       expect(res.user?.id).toBe("student-uuid-1234");
       expect(res.user?.name).toBe("Test Student");
+    });
+
+    it("handles student registration when email confirmation is pending (session null)", async () => {
+      vi.spyOn(supabase.auth, "signUp").mockResolvedValueOnce({
+        data: {
+          user: {
+            id: "student-uuid-pending",
+            email: "pending@campus.edu",
+            confirmed_at: null,
+          } as any,
+          session: null,
+        },
+        error: null,
+      });
+
+      const res = await signUpStudent({
+        email: "pending@campus.edu",
+        password: "SecurePassword123!",
+        fullName: "Pending Student",
+        department: "Computer Science",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.sessionEstablished).toBe(false);
+      expect(res.emailConfirmationRequired).toBe(true);
+      expect(res.user?.id).toBe("student-uuid-pending");
+    });
+
+    it("resends confirmation email via supabase.auth.resend", async () => {
+      const resendSpy = vi.spyOn(supabase.auth, "resend").mockResolvedValueOnce({
+        data: {},
+        error: null,
+      });
+
+      const res = await resendStudentConfirmationEmail("pending@campus.edu");
+      expect(res.success).toBe(true);
+      expect(resendSpy).toHaveBeenCalledWith({
+        type: "signup",
+        email: "pending@campus.edu",
+        options: {
+          emailRedirectTo: expect.any(String),
+        },
+      });
+    });
+
+    it("handles student sign-in with unconfirmed email returning isEmailUnconfirmed: true", async () => {
+      vi.spyOn(supabase.auth, "signInWithPassword").mockResolvedValueOnce({
+        data: { user: null, session: null },
+        error: { message: "Email not confirmed", status: 400 } as any,
+      });
+
+      const res = await signInStudent("unconfirmed@campus.edu", "Password123!");
+      expect(res.success).toBe(false);
+      expect(res.isEmailUnconfirmed).toBe(true);
+      expect(res.error).toContain("Your email has not been confirmed yet");
     });
 
     it("handles student sign-in via supabase.auth.signInWithPassword", async () => {
@@ -174,8 +232,48 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
 
       expect(created.id).toMatch(/^FX-\d+$/);
       expect(created.reporter).toBe("Test Student");
+      expect(created.reporterId).toBe("student-uuid-1234");
       expect(created.status).toBe("Submitted");
       expect(insertSpy).toHaveBeenCalled();
+    });
+
+    it("fetches complaints from Supabase and preserves reporterId", async () => {
+      vi.spyOn(supabase, "from").mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: "FX-5001",
+                title: "Live Database Complaint",
+                description: "Real complaint from Supabase.",
+                category: "Electrical",
+                building: "CS Block",
+                room: "101",
+                urgency: "High",
+                affected: 20,
+                priority: "High",
+                predicted_priority: "High",
+                confidence: 0.94,
+                prediction_source: "Trained Random Forest",
+                status: "Submitted",
+                reporter: "Real Student",
+                reporter_id: "student-uuid-5555",
+                image_url: null,
+                resolution_note: null,
+                linked_complaint_id: null,
+                created_at: "2026-11-01T10:00:00Z",
+              },
+            ],
+            error: null,
+          }),
+        }),
+      } as any);
+
+      const complaints = await fetchComplaintsFromSupabase({ isAdmin: true });
+      expect(complaints).toHaveLength(1);
+      expect(complaints[0].id).toBe("FX-5001");
+      expect(complaints[0].reporterId).toBe("student-uuid-5555");
+      expect(complaints[0].reporter).toBe("Real Student");
     });
 
     it("updates complaint status and priority for administrative review", async () => {

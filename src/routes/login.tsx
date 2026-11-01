@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
-import { signInStudent } from "@/lib/supabase-auth";
+import { signInStudent, resendStudentConfirmationEmail, getStudentAuthState } from "@/lib/supabase-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/login")({
@@ -49,6 +50,47 @@ function Login() {
     >
   >({});
   const [busy, setBusy] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+
+  // Check if student arrived from clicking an email confirmation verification link
+  useEffect(() => {
+    let active = true;
+    const checkVerification = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (active && data.session?.user) {
+          const studentAuth = await getStudentAuthState();
+          if (active && studentAuth.isAuthenticated && studentAuth.user) {
+            setCurrentStudent(studentAuth.user);
+            toast.success(`Email verified! Welcome, ${studentAuth.user.name}.`);
+            nav({ to: "/student" });
+          }
+        }
+      } catch {
+        // Ignored
+      }
+    };
+    checkVerification();
+    return () => {
+      active = false;
+    };
+  }, [nav, setCurrentStudent]);
+
+  const handleResend = async () => {
+    if (!unconfirmedEmail) return;
+    setResending(true);
+    try {
+      const res = await resendStudentConfirmationEmail(unconfirmedEmail);
+      if (res.success) {
+        toast.success(`Verification email sent to ${unconfirmedEmail}. Please check your inbox.`);
+      } else {
+        toast.error(res.error || "Failed to resend confirmation email.");
+      }
+    } finally {
+      setResending(false);
+    }
+  };
 
   const fillDemo = () => {
     setF({ email: DEMO_STUDENT.email, password: "password123" });
@@ -112,6 +154,13 @@ function Login() {
         return;
       }
 
+      if (res.isEmailUnconfirmed) {
+        setUnconfirmedEmail(f.email.trim());
+        setErr({ email: "Email confirmation required." });
+        toast.error("Your email has not been confirmed yet. Please verify your email before logging in.");
+        return;
+      }
+
       setErr({ password: res.error || "Invalid campus credentials." });
       toast.error(res.error || "Authentication failed.");
     } catch (error: unknown) {
@@ -129,6 +178,31 @@ function Login() {
       subtitle="Report issues and follow their progress."
       aside={<AsideCopy />}
     >
+      {unconfirmedEmail && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+          <div className="font-semibold text-amber-950 dark:text-amber-100 mb-1">
+            Email Confirmation Required
+          </div>
+          <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mb-3 leading-relaxed">
+            Your Supabase account exists for <strong>{unconfirmedEmail}</strong>, but its email address has not been confirmed yet.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={resending}
+              onClick={handleResend}
+              className="text-xs bg-white dark:bg-zinc-900"
+            >
+              {resending ? "Sending link…" : "Resend confirmation email"}
+            </Button>
+          </div>
+          <div className="mt-3 border-t border-amber-200/60 pt-2 text-[11px] text-amber-800/80 dark:text-amber-300/80">
+            <strong>Administrator Tip:</strong> You can confirm this user directly in Supabase Dashboard &rarr; <em>Authentication</em> &rarr; <em>Users</em> &rarr; <em>&hellip; (User menu)</em> &rarr; <em>Confirm email</em>, or disable <em>Confirm email</em> under Providers for automatic confirmation.
+          </div>
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="flex justify-end">
           <button

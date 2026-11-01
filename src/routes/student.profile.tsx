@@ -9,7 +9,7 @@ export const Route = createFileRoute("/student/profile")({
 });
 
 function Profile() {
-  const { complaints, currentStudent } = useDemoStore();
+  const { complaints, currentStudent, isSupabaseConnected } = useDemoStore();
   const mine = complaints.filter(
     (c) =>
       (c.reporterId && currentStudent.id
@@ -26,7 +26,7 @@ function Profile() {
   return (
     <>
       <PageHeader title="Profile" description="Your account details." />
-      <DemoNotice>This is a sample demo profile.</DemoNotice>
+      {!isSupabaseConnected && <DemoNotice>This is a sample demo profile.</DemoNotice>}
       <Panel className="mt-5">
         <dl className="divide-y">
           {rows.map(([k, v]) => (

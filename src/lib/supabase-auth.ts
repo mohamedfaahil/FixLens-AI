@@ -272,7 +272,12 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
 export async function signInStudent(
   emailInput: string,
   passwordInput: string,
-): Promise<{ success: boolean; error?: string; user?: StudentAuthUser }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  isEmailUnconfirmed?: boolean;
+  user?: StudentAuthUser;
+}> {
   const email = emailInput.trim().toLowerCase();
   const password = passwordInput;
 
@@ -290,7 +295,17 @@ export async function signInStudent(
     });
 
     if (error) {
-      return { success: false, error: error.message || "Invalid credentials." };
+      const isEmailUnconfirmed =
+        error.message.toLowerCase().includes("email not confirmed") ||
+        error.message.toLowerCase().includes("email_not_confirmed");
+
+      return {
+        success: false,
+        error: isEmailUnconfirmed
+          ? "Your email has not been confirmed yet. Please verify your email before logging in."
+          : error.message || "Invalid credentials.",
+        isEmailUnconfirmed,
+      };
     }
 
     if (!data.session || !data.user) {
@@ -343,6 +358,42 @@ export async function signInStudent(
 }
 
 /**
+ * Resends the email confirmation link for an unconfirmed student account.
+ */
+export async function resendStudentConfirmationEmail(
+  emailInput: string,
+): Promise<{ success: boolean; error?: string }> {
+  const email = emailInput.trim().toLowerCase();
+  if (!email) {
+    return { success: false, error: "Please enter your campus email." };
+  }
+
+  try {
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/login`
+        : undefined;
+
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to resend confirmation email.";
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Registers a new student account in Supabase Auth.
  * Triggers the database profile creation in public.profiles.
  */
@@ -356,6 +407,7 @@ export async function signUpStudent(input: {
   success: boolean;
   error?: string;
   sessionEstablished: boolean;
+  emailConfirmationRequired?: boolean;
   user?: StudentAuthUser;
 }> {
   const email = input.email.trim().toLowerCase();
@@ -375,10 +427,16 @@ export async function signUpStudent(input: {
   }
 
   try {
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/login`
+        : undefined;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
           department,
@@ -400,10 +458,12 @@ export async function signUpStudent(input: {
     }
 
     const sessionEstablished = Boolean(data.session);
+    const emailConfirmationRequired = !sessionEstablished && !data.user.confirmed_at;
 
     return {
       success: true,
       sessionEstablished,
+      emailConfirmationRequired,
       user: {
         id: data.user.id,
         email: data.user.email || email,

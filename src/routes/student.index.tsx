@@ -27,7 +27,7 @@ export const Route = createFileRoute("/student/")({
 });
 
 function Overview() {
-  const { complaints, proposals, currentStudent } = useDemoStore();
+  const { complaints, proposals, currentStudent, isSupabaseConnected } = useDemoStore();
   const nav = useNavigate();
   const mine = complaints.filter(
     (c) =>
@@ -49,15 +49,27 @@ function Overview() {
           </Button>
         }
       />
-      <DemoNotice>The figures below come from sample demo data held in your browser.</DemoNotice>
+      {!isSupabaseConnected && (
+        <DemoNotice>The figures below come from sample demo data held in your browser.</DemoNotice>
+      )}
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="My complaints" value={mine.length} icon={ClipboardList} hint="Demo data" />
-        <StatCard label="Open" value={open} icon={Hourglass} hint="Demo data" />
+        <StatCard
+          label="My complaints"
+          value={mine.length}
+          icon={ClipboardList}
+          hint={isSupabaseConnected ? "Live database" : "Demo data"}
+        />
+        <StatCard
+          label="Open"
+          value={open}
+          icon={Hourglass}
+          hint={isSupabaseConnected ? "Live database" : "Demo data"}
+        />
         <StatCard
           label="Resolved"
           value={mine.filter((c) => c.status === "Resolved").length}
           icon={CheckCircle2}
-          hint="Demo data"
+          hint={isSupabaseConnected ? "Live database" : "Demo data"}
         />
         <StatCard
           label="Active proposals"

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import {
   initialComplaints,
   initialProposals,
@@ -102,11 +103,15 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         getAdminAuthState(),
       ]);
 
+      const isAuthenticated = studentAuth.isAuthenticated || adminAuth.isAuthenticated;
+
       if (studentAuth.isAuthenticated && studentAuth.user) {
         setCurrentStudent(studentAuth.user);
       }
 
-      const activeUserId = studentAuth.user?.id || (adminAuth.isAuthenticated ? undefined : currentStudent.id);
+      const activeUserId =
+        studentAuth.user?.id ||
+        (adminAuth.isAuthenticated ? undefined : (currentStudent.id !== DEMO_STUDENT.id ? currentStudent.id : undefined));
       const isAdmin = adminAuth.isAuthenticated;
 
       const [remoteComplaints, remoteProposals, remoteVotes] = await Promise.all([
@@ -118,17 +123,25 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         activeUserId ? fetchUserVotesFromSupabase(activeUserId) : Promise.resolve([]),
       ]);
 
-      if (remoteComplaints && remoteComplaints.length > 0) {
+      if (isAuthenticated) {
+        // Authenticated user (student or admin): directly populate state from real Supabase database records
         setComplaints(remoteComplaints);
-      }
-      if (remoteProposals && remoteProposals.length > 0) {
         setProposals(remoteProposals);
-      }
-      if (remoteVotes && remoteVotes.length > 0) {
         setVoted(remoteVotes);
+        setIsSupabaseConnected(true);
+      } else {
+        // Unauthenticated demo / offline fallback
+        if (remoteComplaints && remoteComplaints.length > 0) {
+          setComplaints(remoteComplaints);
+        }
+        if (remoteProposals && remoteProposals.length > 0) {
+          setProposals(remoteProposals);
+        }
+        if (remoteVotes && remoteVotes.length > 0) {
+          setVoted(remoteVotes);
+        }
+        setIsSupabaseConnected(false);
       }
-
-      setIsSupabaseConnected(true);
     } catch (err) {
       logStoreNotice("[Demo Store] Supabase sync notice:", err);
     } finally {
@@ -201,9 +214,12 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setComplaints((xs) => xs.map((c) => (c.id === complaintId ? updated : c)));
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id) {
+      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
         addFollowUpInSupabase(complaintId, trimmed, currentStudent).catch((err) => {
           logStoreNotice("[Demo Store] Follow-up Supabase sync notice:", err);
+          if (!isTestMode) {
+            toast.error("Could not save follow-up to Supabase: " + (err instanceof Error ? err.message : String(err)));
+          }
         });
       }
 
@@ -241,13 +257,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setComplaints((xs) => [item, ...xs]);
 
       // Asynchronously persist to Supabase if authenticated
-      if (currentStudent.id) {
+      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
         createComplaintInSupabase(c, currentStudent, imageFile)
           .then((persisted) => {
             setComplaints((xs) => xs.map((comp) => (comp.id === localId ? persisted : comp)));
           })
           .catch((err) => {
             logStoreNotice("[Demo Store] Complaint Supabase persist notice:", err);
+            if (!isTestMode) {
+              toast.error("Could not save to Supabase: " + (err instanceof Error ? err.message : String(err)));
+            }
           });
       }
 
@@ -316,13 +335,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setVoted((v) => [...v, item.id]);
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id) {
+      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
         createProposalInSupabase(p, currentStudent)
           .then((persisted) => {
             setProposals((xs) => xs.map((prop) => (prop.id === item.id ? persisted : prop)));
           })
           .catch((err) => {
             logStoreNotice("[Demo Store] Proposal create Supabase sync notice:", err);
+            if (!isTestMode) {
+              toast.error("Could not save proposal to Supabase: " + (err instanceof Error ? err.message : String(err)));
+            }
           });
       }
 
@@ -335,9 +357,12 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setProposals((xs) => xs.map((p) => (p.id === id ? { ...p, support: p.support + 1 } : p)));
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id) {
+      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
         voteProposalInSupabase(id, currentStudent.id).catch((err) => {
           logStoreNotice("[Demo Store] Vote Supabase sync notice:", err);
+          if (!isTestMode) {
+            toast.error("Could not save vote to Supabase: " + (err instanceof Error ? err.message : String(err)));
+          }
         });
       }
 

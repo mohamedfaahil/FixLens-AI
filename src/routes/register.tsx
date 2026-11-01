@@ -8,7 +8,7 @@ import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { FieldError, selectCls } from "@/components/fixlens/ui-bits";
 import { DEPARTMENTS, DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
-import { signUpStudent } from "@/lib/supabase-auth";
+import { signUpStudent, resendStudentConfirmationEmail } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/register")({
@@ -32,6 +32,8 @@ function Register() {
     confirm: "",
   });
   const [busy, setBusy] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const [err, setErr] = useState<
     Partial<
       Record<
@@ -127,8 +129,8 @@ function Register() {
           toast.success(`Welcome, ${res.user.name}! Student account created.`);
           nav({ to: "/student" });
         } else {
-          toast.success("Account registered! Please check your email to verify your account or sign in.");
-          nav({ to: "/login" });
+          setPendingEmail(f.email.trim());
+          toast.success("Account registered! Email confirmation is required before login.");
         }
         return;
       }
@@ -156,13 +158,68 @@ function Register() {
     }
   };
 
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    setResending(true);
+    try {
+      const res = await resendStudentConfirmationEmail(pendingEmail);
+      if (res.success) {
+        toast.success(`Verification email sent to ${pendingEmail}. Please check your inbox.`);
+      } else {
+        toast.error(res.error || "Failed to resend confirmation email.");
+      }
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <AuthLayout
       title="Create student account"
       subtitle="Register with your campus email."
       aside={<AsideCopy />}
     >
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      {pendingEmail ? (
+        <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-5 text-sm dark:border-blue-900/50 dark:bg-blue-950/30">
+          <div className="flex items-start gap-3">
+            <div className="size-2 mt-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
+            <div className="space-y-1">
+              <h3 className="font-semibold text-blue-950 dark:text-blue-100">
+                Confirm your campus email
+              </h3>
+              <p className="text-xs text-blue-900/80 dark:text-blue-200/80 leading-relaxed">
+                Your account was created for <strong>{pendingEmail}</strong>. Supabase requires email verification before you can sign in.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => nav({ to: "/login" })}
+            >
+              Go to Login
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={resending}
+              onClick={handleResend}
+              className="w-full sm:w-auto bg-white dark:bg-zinc-900"
+            >
+              {resending ? "Sending link…" : "Resend confirmation email"}
+            </Button>
+          </div>
+
+          <div className="border-t border-blue-200/60 pt-3 dark:border-blue-900/40 text-[11px] text-blue-800/80 dark:text-blue-300/80">
+            <strong>Administrator Tip:</strong> To enable instant sign-up without email verification, open Supabase Dashboard &rarr; <em>Authentication</em> &rarr; <em>Providers</em> &rarr; <em>Email</em> &rarr; toggle <strong>Confirm email</strong> off.
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="flex justify-end">
           <button
             type="button"
@@ -234,6 +291,7 @@ function Register() {
           {busy ? "Creating account…" : "Create account"}
         </Button>
       </form>
+      )}
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Already registered?{" "}
         <Link to="/login" className="font-semibold text-primary hover:underline">

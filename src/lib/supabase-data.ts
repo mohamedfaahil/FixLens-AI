@@ -174,6 +174,7 @@ export async function fetchComplaintsFromSupabase(options: {
             status: c.status as Status,
             date: c.created_at.slice(0, 10),
             reporter: c.reporter,
+            reporterId: c.reporter_id || undefined,
             image: resolvedImg || c.image_url || undefined,
             resolutionNote: c.resolution_note || undefined,
             linkedComplaintId: c.linked_complaint_id || undefined,
@@ -253,6 +254,7 @@ export async function fetchComplaintsFromSupabase(options: {
               status: c.status as Status,
               date: c.created_at.slice(0, 10),
               reporter: c.reporter,
+              reporterId: c.reporter_id || undefined,
               image: resolvedImg || c.image_url || undefined,
               resolutionNote: c.resolution_note || undefined,
               linkedComplaintId: c.linked_complaint_id || undefined,
@@ -297,6 +299,7 @@ export async function fetchComplaintsFromSupabase(options: {
                 status: s.status as Status,
                 date: s.created_at.slice(0, 10),
                 reporter: s.reporter || "Campus Resident",
+                reporterId: s.reporter_id || undefined,
                 image: resolvedImg || s.image_url || undefined,
                 linkedComplaintId: s.linked_complaint_id || undefined,
                 timeline: [
@@ -362,7 +365,7 @@ export async function createComplaintInSupabase(
     building: draft.building,
     room: draft.room || null,
     urgency: draft.urgency,
-    affected: draft.affected || 1,
+    affected: typeof draft.affected === "number" ? draft.affected : (Number(draft.affected) || 1),
     priority: draft.priority,
     predicted_priority: draft.predictedPriority || null,
     confidence: draft.confidence || null,
@@ -402,6 +405,7 @@ export async function createComplaintInSupabase(
     status: "Submitted",
     date: todayStr,
     reporter: user.name,
+    reporterId: user.id || undefined,
     image: resolvedImg || storedImagePath,
     timeline: [
       {

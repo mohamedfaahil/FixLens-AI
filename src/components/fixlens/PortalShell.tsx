@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DemoBadge, Logo } from "./ui-bits";
 import { signOutAdmin, signOutStudent } from "@/lib/supabase-auth";
+import { useDemoStore } from "@/lib/demo-store";
 import { toast } from "sonner";
 
 export interface NavItem {
@@ -36,6 +37,7 @@ export function PortalShell({ nav, portal, user, children }: Props) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const navigate = useNavigate();
+  const { isSupabaseConnected } = useDemoStore();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (i: NavItem) =>
     i.exact ? path === i.to || path === i.to + "/" : path.startsWith(i.to);
@@ -110,10 +112,24 @@ export function PortalShell({ nav, portal, user, children }: Props) {
             <Logo to="/" />
           </span>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Changes stay in this browser tab only
-            </span>
-            <DemoBadge />
+            {isSupabaseConnected ? (
+              <>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  Live Supabase Connected
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Supabase Live
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  Changes stay in this browser tab only
+                </span>
+                <DemoBadge />
+              </>
+            )}
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
