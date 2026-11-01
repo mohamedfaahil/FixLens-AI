@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AdminAside } from "@/components/fixlens/AuthAside";
-import { DEMO_ADMIN } from "@/lib/demo-data";
+import { signInAdmin, ADMIN_ACCOUNT } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin-login")({
@@ -49,12 +49,12 @@ function AdminLogin() {
   const [busy, setBusy] = useState(false);
 
   const fillDemo = () => {
-    setF({ email: DEMO_ADMIN.email, password: "adminPassword123" });
+    setF((prev) => ({ ...prev, email: ADMIN_ACCOUNT.email }));
     setErr({});
-    toast.info("Demo administrator credentials pre-filled.");
+    toast.info("Administrator email filled. Please enter your password.");
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Partial<
       Record<
@@ -83,15 +83,24 @@ function AdminLogin() {
     if (!f.email.trim()) er.email = "Please enter administrator email.";
     else if (!/^\S+@\S+\.\S+$/.test(f.email)) er.email = "Enter a valid administrator email.";
     if (!f.password) er.password = "Please enter administrator password.";
-    else if (f.password.length < 6) er.password = "Password must be at least 6 characters.";
     setErr(er);
     if (Object.keys(er).length) return;
     setBusy(true);
 
-    setTimeout(() => {
-      toast.info("Demo mode: administrator access granted. Opening admin portal.");
+    try {
+      const res = await signInAdmin(f.email, f.password);
+      if (!res.success) {
+        setErr({ password: res.error || "Invalid administrator credentials." });
+        toast.error(res.error || "Authentication failed.");
+        return;
+      }
+      toast.success("Administrator authenticated with Supabase. Access granted.");
       nav({ to: "/admin" });
-    }, 300);
+    } catch {
+      toast.error("Failed to authenticate administrator.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -103,8 +112,8 @@ function AdminLogin() {
       <div className="mb-5 flex gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3.5 text-sm text-foreground">
         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
         <p>
-          <strong>Restricted access.</strong> This area is for authorised campus administrators.
-          Students should use the student login.
+          <strong>Restricted access.</strong> This area is restricted to authorized FixLens AI
+          administrators (<code>{ADMIN_ACCOUNT.email}</code>).
         </p>
       </div>
       <form onSubmit={submit} className="space-y-4" noValidate>
@@ -114,7 +123,7 @@ function AdminLogin() {
             onClick={fillDemo}
             className="text-xs font-semibold text-primary underline hover:text-primary/80"
           >
-            Auto-fill demo credentials
+            Fill admin email
           </button>
         </div>
         <TextField

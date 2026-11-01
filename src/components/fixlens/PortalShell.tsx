@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DemoBadge, Logo } from "./ui-bits";
+import { signOutAdmin } from "@/lib/supabase-auth";
+import { toast } from "sonner";
 
 export interface NavItem {
   to: string;
@@ -121,14 +123,30 @@ export function PortalShell({ nav, portal, user, children }: Props) {
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sign out of the demo?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {portal === "Administrator" ? "Sign out of Administrator Portal?" : "Sign out of the demo?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              You will return to the homepage. Demo changes are kept until you refresh the page.
+              {portal === "Administrator"
+                ? "You will be signed out from your Supabase administrator session and returned to the admin login."
+                : "You will return to the homepage. Demo changes are kept until you refresh the page."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => navigate({ to: "/" })}>Sign out</AlertDialogAction>
+            <AlertDialogAction
+              onClick={async () => {
+                if (portal === "Administrator") {
+                  await signOutAdmin();
+                  toast.success("Administrator session closed.");
+                  navigate({ to: "/admin-login" });
+                } else {
+                  navigate({ to: "/" });
+                }
+              }}
+            >
+              Sign out
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

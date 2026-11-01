@@ -129,9 +129,9 @@ export const DEMO_STUDENT = {
 };
 
 export const DEMO_ADMIN = {
-  name: "Dr. R. Menon",
-  email: "facilities.admin@campus.edu",
-  role: "Facilities Administrator",
+  name: "Facilities Administrator",
+  email: "adminfix@gmail.com",
+  role: "Campus Maintenance Administrator",
 };
 
 export const initialComplaints: Complaint[] = [
