@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { predictComplaintPriority, checkMLServiceHealth } from "../lib/ml-api";
+import { predictComplaintPriority, checkMLServiceHealth, warmupMLService } from "../lib/ml-api";
 import { PredictionCard } from "../components/fixlens/PriorityPanel";
 
 describe("FixLens AI — ML Integration & Fallback Verification", () => {
@@ -252,5 +252,15 @@ describe("FixLens AI — ML Integration & Fallback Verification", () => {
     expect(health.healthy).toBe(false);
     expect(health.modelLoaded).toBe(false);
     expect(health.message).toContain("offline");
+  });
+
+  it("triggers warmupMLService without throwing errors", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "healthy" }),
+    } as Response);
+
+    expect(() => warmupMLService()).not.toThrow();
   });
 });

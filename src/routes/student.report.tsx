@@ -37,7 +37,7 @@ import {
   type Complaint,
   type Priority,
 } from "@/lib/demo-data";
-import { predictComplaintPriority, type MLPredictionResult } from "@/lib/ml-api";
+import { predictComplaintPriority, warmupMLService, type MLPredictionResult } from "@/lib/ml-api";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/student/report")({
@@ -118,6 +118,11 @@ function Report() {
       setF(next);
       setReportDraft(next);
     };
+
+  // Warm up Render backend ML service early in the background while student fills out form
+  useEffect(() => {
+    warmupMLService();
+  }, []);
 
   // Debounced real-time priority prediction from Python ML API or fallback
   useEffect(() => {

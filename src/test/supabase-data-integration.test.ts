@@ -9,6 +9,7 @@ import {
 } from "@/lib/supabase-auth";
 import {
   fetchComplaintsFromSupabase,
+  fetchComplaintByIdFromSupabase,
   createComplaintInSupabase,
   updateComplaintInSupabase,
   addFollowUpInSupabase,
@@ -274,6 +275,45 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
       expect(complaints[0].id).toBe("FX-5001");
       expect(complaints[0].reporterId).toBe("student-uuid-5555");
       expect(complaints[0].reporter).toBe("Real Student");
+    });
+
+    it("fetches single complaint by ID via fetchComplaintByIdFromSupabase", async () => {
+      vi.spyOn(supabase, "from").mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "FX-9940",
+                title: "Specific Complaint by ID",
+                description: "Direct lookup verification.",
+                category: "Electrical",
+                building: "Library",
+                room: "L204",
+                urgency: "Medium",
+                affected: 10,
+                priority: "Medium",
+                predicted_priority: "Medium",
+                confidence: 0.88,
+                prediction_source: "Trained TF-IDF + Random Forest Model",
+                status: "Submitted",
+                reporter: "Alice Smith",
+                reporter_id: "alice-uuid",
+                image_url: null,
+                created_at: "2026-11-01T12:00:00Z",
+              },
+              error: null,
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      } as any);
+
+      const found = await fetchComplaintByIdFromSupabase("FX-9940");
+      expect(found).not.toBeNull();
+      expect(found?.id).toBe("FX-9940");
+      expect(found?.title).toBe("Specific Complaint by ID");
+      expect(found?.reporter).toBe("Alice Smith");
+      expect(found?.isTrainedModel).toBe(true);
     });
 
     it("updates complaint status and priority for administrative review", async () => {

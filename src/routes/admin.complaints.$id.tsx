@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,9 +13,11 @@ import {
   demoPredictPriority,
   PRIORITIES,
   STATUSES,
+  type Complaint,
   type Priority,
   type Status,
 } from "@/lib/demo-data";
+import { fetchComplaintByIdFromSupabase } from "@/lib/supabase-data";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin/complaints/$id")({
@@ -26,8 +28,40 @@ export const Route = createFileRoute("/admin/complaints/$id")({
 
 function AdminDetail() {
   const { id } = Route.useParams();
-  const { complaints, updateComplaint } = useDemoStore();
-  const c = complaints.find((x) => x.id === id);
+  const { complaints, updateComplaint, isLoading } = useDemoStore();
+  const storeComplaint = complaints.find((x) => x.id === id);
+  const [directComplaint, setDirectComplaint] = useState<Complaint | null>(null);
+  const [isDirectLoading, setIsDirectLoading] = useState<boolean>(!storeComplaint);
+
+  useEffect(() => {
+    if (storeComplaint) {
+      setIsDirectLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsDirectLoading(true);
+    fetchComplaintByIdFromSupabase(id)
+      .then((fetched) => {
+        if (isMounted) {
+          setDirectComplaint(fetched);
+          setIsDirectLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsDirectLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, storeComplaint]);
+
+  const c = storeComplaint || directComplaint;
+  const isStillLoading = (isLoading || isDirectLoading) && !c;
+
   const [status, setStatus] = useState<Status | "">("");
   const [priority, setPriority] = useState<Priority | "">("");
   const [note, setNote] = useState("");
@@ -38,6 +72,18 @@ function AdminDetail() {
       </Link>
     </Button>
   );
+
+  if (isStillLoading) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center">
+        <div className="text-center space-y-2">
+          <Loader2 className="mx-auto size-6 animate-spin text-primary" />
+          <p className="text-xs text-muted-foreground">Loading complaint details…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!c)
     return (
       <>

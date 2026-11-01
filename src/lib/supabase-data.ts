@@ -327,11 +327,185 @@ export async function fetchComplaintsFromSupabase(options: {
 }
 
 /**
+ * Fetches a single complaint by its ID from Supabase.
+ * Checks public.complaints directly first, with fallback to get_complaint_by_id RPC
+ * to handle security definer access rules, timeline, and signed image URL.
+ */
+export async function fetchComplaintByIdFromSupabase(complaintId: string): Promise<Complaint | null> {
+  if (!complaintId) return null;
+
+  try {
+    // 1. Attempt direct select from public.complaints
+    const { data: c, error } = await supabase
+      .from("complaints")
+      .select("*")
+      .eq("id", complaintId)
+      .maybeSingle();
+
+    if (!error && c) {
+      // Fetch associated timeline and follow-ups in parallel
+      const [tlRes, fuRes] = await Promise.all([
+        supabase
+          .from("complaint_timeline")
+          .select("*")
+          .eq("complaint_id", complaintId)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("complaint_follow_ups")
+          .select("*")
+          .eq("complaint_id", complaintId)
+          .order("created_at", { ascending: true }),
+      ]);
+
+      const resolvedImg = await resolveSignedImageUrl(c.image_url);
+
+      const timeline: TimelineEvent[] =
+        tlRes.data && tlRes.data.length > 0
+          ? tlRes.data.map((t) => ({
+              status: t.status as Status,
+              date: t.created_at.slice(0, 10),
+              note: t.note || "",
+              by: t.by,
+            }))
+          : [
+              {
+                status: c.status as Status,
+                date: c.created_at.slice(0, 10),
+                note: "Complaint recorded.",
+                by: c.reporter,
+              },
+            ];
+
+      const followUps: FollowUpNote[] = (fuRes.data || []).map((f) => ({
+        id: f.id,
+        date: f.created_at.slice(0, 10),
+        timestamp: new Date(f.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        content: f.content,
+        by: f.author,
+      }));
+
+      return {
+        id: c.id,
+        title: c.title,
+        description: c.description,
+        category: c.category as Category,
+        building: c.building,
+        room: c.room || "",
+        urgency: c.urgency as Priority,
+        affected: c.affected,
+        priority: c.priority as Priority,
+        predictedPriority: (c.predicted_priority as Priority) || undefined,
+        confidence: c.confidence !== null ? Number(c.confidence) : undefined,
+        predictionSource: c.prediction_source || undefined,
+        isTrainedModel: Boolean(c.prediction_source?.includes("Trained")),
+        status: c.status as Status,
+        date: c.created_at.slice(0, 10),
+        reporter: c.reporter,
+        reporterId: c.reporter_id || undefined,
+        image: resolvedImg || c.image_url || undefined,
+        resolutionNote: c.resolution_note || undefined,
+        linkedComplaintId: c.linked_complaint_id || undefined,
+        timeline,
+        followUps,
+      };
+    }
+
+    // 2. Fallback to RPC get_complaint_by_id (handles authenticated RLS & masking)
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_complaint_by_id", {
+      complaint_id_param: complaintId,
+    });
+
+    if (!rpcErr && rpcRows && rpcRows.length > 0) {
+      const r = (rpcRows as any[])[0];
+      const [tlRes, fuRes] = await Promise.all([
+        supabase
+          .from("complaint_timeline")
+          .select("*")
+          .eq("complaint_id", complaintId)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("complaint_follow_ups")
+          .select("*")
+          .eq("complaint_id", complaintId)
+          .order("created_at", { ascending: true }),
+      ]);
+
+      const resolvedImg = await resolveSignedImageUrl(r.image_url);
+
+      const timeline: TimelineEvent[] =
+        tlRes.data && tlRes.data.length > 0
+          ? tlRes.data.map((t) => ({
+              status: t.status as Status,
+              date: t.created_at.slice(0, 10),
+              note: t.note || "",
+              by: t.by,
+            }))
+          : [
+              {
+                status: r.status as Status,
+                date: r.created_at
+                  ? r.created_at.slice(0, 10)
+                  : new Date().toISOString().slice(0, 10),
+                note: `Status: ${r.status}`,
+                by: "Facilities Team",
+              },
+            ];
+
+      const followUps: FollowUpNote[] = (fuRes.data || []).map((f) => ({
+        id: f.id,
+        date: f.created_at.slice(0, 10),
+        timestamp: new Date(f.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        content: f.content,
+        by: f.author,
+      }));
+
+      return {
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        category: r.category as Category,
+        building: r.building,
+        room: r.room || "",
+        urgency: r.urgency as Priority,
+        affected: r.affected,
+        priority: r.priority as Priority,
+        predictedPriority: (r.predicted_priority as Priority) || undefined,
+        confidence: r.confidence !== null ? Number(r.confidence) : undefined,
+        predictionSource: r.prediction_source || undefined,
+        isTrainedModel: Boolean(r.prediction_source?.includes("Trained")),
+        status: r.status as Status,
+        date: r.created_at
+          ? r.created_at.slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
+        reporter: r.reporter || "Campus Resident",
+        reporterId: r.reporter_id || undefined,
+        image: resolvedImg || r.image_url || undefined,
+        resolutionNote: r.resolution_note || undefined,
+        linkedComplaintId: r.linked_complaint_id || undefined,
+        timeline,
+        followUps,
+      };
+    }
+
+    return null;
+  } catch (err) {
+    logWarning("[Supabase Data] Failed to fetch complaint by ID:", err);
+    return null;
+  }
+}
+
+/**
  * Inserts a new complaint into Supabase, saves attached image to private storage,
  * and records the initial timeline event.
  */
 export async function createComplaintInSupabase(
-  draft: Omit<Complaint, "id" | "status" | "date" | "reporter" | "timeline" | "followUps">,
+  draft: Omit<Complaint, "id" | "status" | "date" | "reporter" | "timeline" | "followUps"> & { id?: string },
   user: { id?: string; name: string },
   imageFile?: File,
 ): Promise<Complaint> {
@@ -346,9 +520,8 @@ export async function createComplaintInSupabase(
     }
   }
 
-  // 2. Determine complaint ID
-  const numId = Math.floor(1000 + Math.random() * 9000);
-  const complaintId = `FX-${numId}`;
+  // 2. Determine complaint ID (use existing ID if specified, or generate new reference ID)
+  const complaintId = draft.id || `FX-${Math.floor(1000 + Math.random() * 9000)}`;
   const nowIso = new Date().toISOString();
   const todayStr = nowIso.slice(0, 10);
 

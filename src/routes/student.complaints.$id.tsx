@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,8 @@ import { EmptyState, PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { ComplaintSummary } from "@/components/fixlens/ComplaintDetail";
 import { MethodExplainer, PredictionCard } from "@/components/fixlens/PriorityPanel";
 import { useDemoStore } from "@/lib/demo-store";
-import { demoPredictPriority } from "@/lib/demo-data";
+import { demoPredictPriority, type Complaint } from "@/lib/demo-data";
+import { fetchComplaintByIdFromSupabase } from "@/lib/supabase-data";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/student/complaints/$id")({
@@ -22,7 +24,38 @@ function Detail() {
   const { from } = Route.useSearch();
   const navigate = useNavigate();
   const { complaints, currentStudent, isLoading } = useDemoStore();
-  const c = complaints.find((x) => x.id === id);
+  const storeComplaint = complaints.find((x) => x.id === id);
+  const [directComplaint, setDirectComplaint] = useState<Complaint | null>(null);
+  const [isDirectLoading, setIsDirectLoading] = useState<boolean>(!storeComplaint);
+
+  useEffect(() => {
+    if (storeComplaint) {
+      setIsDirectLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsDirectLoading(true);
+    fetchComplaintByIdFromSupabase(id)
+      .then((fetched) => {
+        if (isMounted) {
+          setDirectComplaint(fetched);
+          setIsDirectLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsDirectLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, storeComplaint]);
+
+  const c = storeComplaint || directComplaint;
+  const isStillLoading = (isLoading || isDirectLoading) && !c;
 
   const isFromReport = from === "report";
   const back = (
@@ -42,7 +75,7 @@ function Detail() {
     </Button>
   );
 
-  if (isLoading && !c) {
+  if (isStillLoading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
         <div className="text-center space-y-2">

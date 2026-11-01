@@ -84,9 +84,9 @@ app.add_middleware(
 
 class ComplaintPredictRequest(BaseModel):
     description: str = Field(..., min_length=3, description="Detailed description of the maintenance issue")
-    category: str = Field(..., min_length=2, description="Maintenance category (e.g. Electrical, Plumbing, Safety)")
-    urgency: str = Field(..., description="Reported urgency level (Low, Medium, High)")
-    affected: int = Field(default=1, ge=1, le=10000, description="Estimated number of students/staff affected")
+    category: Optional[str] = Field(default="Other", description="Maintenance category (e.g. Electrical, Plumbing, Safety)")
+    urgency: Optional[str] = Field(default="Medium", description="Reported urgency level (Low, Medium, High)")
+    affected: Optional[int] = Field(default=1, ge=1, le=10000, description="Estimated number of students/staff affected")
 
 class PredictionResponse(BaseModel):
     status: str
@@ -148,13 +148,20 @@ def predict_priority(req: ComplaintPredictRequest):
         )
 
     try:
+        # Sanitize and normalize input values for Random Forest pipeline
+        desc = (req.description or "").strip()
+        cat = (req.category or "Other").strip() or "Other"
+        raw_urg = (req.urgency or "Medium").strip().capitalize()
+        urg = raw_urg if raw_urg in ["High", "Medium", "Low"] else "Medium"
+        aff = max(1, min(10000, int(req.affected or 1)))
+
         # Prepare DataFrame strictly matching model training columns
         input_data = pd.DataFrame([
             {
-                "description": req.description.strip(),
-                "category": req.category.strip(),
-                "urgency": req.urgency.strip(),
-                "affected": req.affected,
+                "description": desc,
+                "category": cat,
+                "urgency": urg,
+                "affected": aff,
             }
         ])
 
@@ -172,9 +179,9 @@ def predict_priority(req: ComplaintPredictRequest):
         signals = [
             f"Random Forest confidence: {confidence * 100:.1f}% for {predicted_priority} priority",
             f"Class probability distribution: High {prob_dict.get('High', 0)*100:.0f}%, Medium {prob_dict.get('Medium', 0)*100:.0f}%, Low {prob_dict.get('Low', 0)*100:.0f}%",
-            f"Issue category factor: {req.category.strip()}",
-            f"Reported student urgency: {req.urgency.strip()}",
-            f"Impact scale: {req.affected} person(s) affected",
+            f"Issue category factor: {cat}",
+            f"Reported student urgency: {urg}",
+            f"Impact scale: {aff} person(s) affected",
         ]
 
         return PredictionResponse(

@@ -258,7 +258,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
 
       // Asynchronously persist to Supabase if authenticated
       if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
-        createComplaintInSupabase(c, currentStudent, imageFile)
+        createComplaintInSupabase({ ...c, id: localId }, currentStudent, imageFile)
           .then((persisted) => {
             setComplaints((xs) => xs.map((comp) => (comp.id === localId ? persisted : comp)));
           })
