@@ -253,7 +253,7 @@ describe("FixLens AI — Cross-Student Navigation & Access Control", () => {
 
     expect(result.current.votedIds).toEqual([]);
     expect(result.current.reportDraft).toBeNull();
-    expect(result.current.currentStudent.name).toBe("Aisha Rahman");
+    expect(result.current.currentStudent.name).toBe("");
     expect(
       result.current.proposals.find((p) => p.title === "Install bicycle racks outside cafeteria"),
     ).toBeUndefined();

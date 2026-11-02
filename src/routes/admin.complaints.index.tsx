@@ -21,6 +21,7 @@ function AllComplaints() {
       />
       <ComplaintList
         showReporter
+        showExport
         complaints={complaints}
         onOpen={(c) => nav({ to: "/admin/complaints/$id", params: { id: c.id } })}
       />

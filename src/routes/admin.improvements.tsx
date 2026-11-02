@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ThumbsUp } from "lucide-react";
+import { Download, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
 import { useDemoStore } from "@/lib/demo-store";
 import { PROPOSAL_STATUSES, type Proposal, type ProposalStatus } from "@/lib/demo-data";
 import { pageHead } from "@/lib/seo";
+import { exportProposalsToCSV } from "@/lib/csv-export";
 
 export const Route = createFileRoute("/admin/improvements")({
   head: () =>
@@ -27,11 +28,23 @@ export const Route = createFileRoute("/admin/improvements")({
 
 function Review() {
   const { proposals } = useDemoStore();
+
+  const handleExportProposals = () => {
+    exportProposalsToCSV(proposals);
+    toast.success(`Exported ${proposals.length} proposals to CSV.`);
+  };
+
   return (
     <>
       <PageHeader
         title="Proposal review"
         description="Sorted by student support. Support shows interest; you decide the outcome."
+        actions={
+          <Button variant="outline" size="sm" onClick={handleExportProposals} className="text-xs">
+            <Download className="size-3.5 mr-1.5" />
+            Export Proposals CSV
+          </Button>
+        }
       />
       {proposals.length === 0 ? (
         <EmptyState

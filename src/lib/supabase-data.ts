@@ -655,6 +655,19 @@ export async function updateComplaintInSupabase(
     updated_at: new Date().toISOString(),
   };
 
+  // Inspect previous complaint state to detect genuine operational priority changes
+  let previousComplaint: { reporter_id: string | null; title: string | null; priority: Priority | null } | null = null;
+  try {
+    const { data: comp } = await supabase
+      .from("complaints")
+      .select("reporter_id, title, priority")
+      .eq("id", id)
+      .maybeSingle();
+    previousComplaint = comp;
+  } catch (err) {
+    logWarning("[Supabase Data] Notice: Failed to fetch previous complaint state:", err);
+  }
+
   if (patch.status) updateData.status = patch.status;
   if (patch.priority) {
     updateData.priority = patch.priority;
@@ -717,6 +730,54 @@ export async function updateComplaintInSupabase(
       }
     } catch (err) {
       logWarning("[Supabase Data] Notification dispatch notice:", err);
+    }
+  }
+
+  // Detect and notify reporter of genuine operational priority escalations (e.g. Low -> Medium, Medium -> High)
+  const PRIORITY_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+  const newPriority = patch.priority || patch.escalatedPriority;
+  const oldPriority = previousComplaint?.priority || "Low";
+  const isGenuineEscalation = Boolean(
+    newPriority && (PRIORITY_RANK[newPriority] ?? 0) > (PRIORITY_RANK[oldPriority] ?? 0),
+  );
+
+  if (isGenuineEscalation && previousComplaint?.reporter_id) {
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", previousComplaint.reporter_id)
+        .maybeSingle();
+
+      if (prof?.email) {
+        // Avoid duplicate escalation notifications for the same reference
+        const { data: recentNotif } = await supabase
+          .from("notifications")
+          .select("id")
+          .eq("user_id", previousComplaint.reporter_id)
+          .eq("reference_id", id)
+          .ilike("title", "%Priority Escalated%")
+          .limit(1)
+          .maybeSingle();
+
+        if (!recentNotif) {
+          const reasons = patch.escalationReasons?.length
+            ? ` Reasons: ${patch.escalationReasons.join(", ")}.`
+            : "";
+          const noteText = patch.note?.trim() ? ` Note: ${patch.note.trim()}` : "";
+          await supabase.from("notifications").insert({
+            user_id: previousComplaint.reporter_id,
+            recipient_email: prof.email,
+            title: `Priority Escalated: ${previousComplaint.title || id}`,
+            message: `Operational priority has been escalated to ${newPriority}.${reasons}${noteText}`,
+            type: "status_update",
+            reference_id: id,
+            is_read: false,
+          });
+        }
+      }
+    } catch (err) {
+      logWarning("[Supabase Data] Priority escalation notification dispatch notice:", err);
     }
   }
 }
@@ -930,6 +991,29 @@ export async function reviewProposalInSupabase(
     logError("[Supabase Data] Failed to review proposal:", error);
     throw new Error(`Failed to review proposal: ${error.message}`);
   }
+
+  // Dispatch in-app notification to proposal author in Supabase
+  try {
+    const { data: prop } = await supabase
+      .from("proposals")
+      .select("author_id, title")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (prop?.author_id) {
+      await supabase.from("notifications").insert({
+        user_id: prop.author_id,
+        recipient_email: "student",
+        title: `Proposal Decision: ${prop.title}`,
+        message: `Your campus improvement proposal status has been updated to "${status}"${note.trim() ? `: "${note.trim()}"` : "."}`,
+        type: "proposal",
+        reference_id: id,
+        is_read: false,
+      });
+    }
+  } catch {
+    // Non-fatal notification dispatch notice
+  }
 }
 
 // ====================================================================
@@ -1017,6 +1101,53 @@ export async function recordEscalationInSupabase(audit: EscalationAuditRecord): 
       admin_reviewed: audit.adminReviewed,
       created_at: audit.timestamp,
     });
+
+    // Notify complaint reporter if genuine priority escalation occurred
+    const PRIORITY_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+    if ((PRIORITY_RANK[audit.escalatedPriority] ?? 0) > (PRIORITY_RANK[audit.previousPriority] ?? 0)) {
+      try {
+        const { data: comp } = await supabase
+          .from("complaints")
+          .select("reporter_id, title")
+          .eq("id", audit.complaintId)
+          .maybeSingle();
+
+        if (comp?.reporter_id) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", comp.reporter_id)
+            .maybeSingle();
+
+          if (prof?.email) {
+            // Prevent duplicate escalation notifications
+            const { data: recentNotif } = await supabase
+              .from("notifications")
+              .select("id")
+              .eq("user_id", comp.reporter_id)
+              .eq("reference_id", audit.complaintId)
+              .ilike("title", "%Priority Escalated%")
+              .limit(1)
+              .maybeSingle();
+
+            if (!recentNotif) {
+              const reasonsText = audit.reasons?.length ? ` Reasons: ${audit.reasons.join(", ")}.` : "";
+              await supabase.from("notifications").insert({
+                user_id: comp.reporter_id,
+                recipient_email: prof.email,
+                title: `Priority Escalated: ${comp.title || audit.complaintId}`,
+                message: `Operational priority has been escalated to ${audit.escalatedPriority}.${reasonsText}`,
+                type: "status_update",
+                reference_id: audit.complaintId,
+                is_read: false,
+              });
+            }
+          }
+        }
+      } catch (notifErr) {
+        logWarning("[Supabase Data] Priority escalation audit notification notice:", notifErr);
+      }
+    }
   } catch (err) {
     logWarning("[Supabase Data] Escalation record notice:", err);
   }

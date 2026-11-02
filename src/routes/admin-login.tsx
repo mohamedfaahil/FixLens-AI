@@ -1,14 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AdminAside } from "@/components/fixlens/AuthAside";
-import {
-  signInAdmin,
-  ADMIN_ACCOUNT,
-} from "@/lib/supabase-auth";
+import { signInAdmin } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin-login")({
@@ -50,12 +46,6 @@ export function AdminLogin() {
     >
   >({});
   const [busy, setBusy] = useState(false);
-
-  const fillDemo = () => {
-    setF((prev) => ({ ...prev, email: ADMIN_ACCOUNT.email }));
-    setErr({});
-    toast.info("Administrator email filled. Please enter your password.");
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,23 +102,7 @@ export function AdminLogin() {
       subtitle="Facilities and maintenance staff only."
       aside={<AdminAside />}
     >
-      <div className="mb-5 flex gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3.5 text-sm text-foreground">
-        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-        <p>
-          <strong>Restricted access.</strong> This area is restricted to authorized FixLens AI
-          administrators (<code>{ADMIN_ACCOUNT.email}</code>).
-        </p>
-      </div>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={fillDemo}
-            className="text-xs font-semibold text-primary underline hover:text-primary/80"
-          >
-            Fill admin email
-          </button>
-        </div>
         <TextField
           id="email"
           label="Administrator email"

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DemoNotice, FieldError, Logo } from "./ui-bits";
+import { FieldError, Logo } from "./ui-bits";
 
 export function AuthLayout({
   title,
@@ -22,12 +22,6 @@ export function AuthLayout({
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
           <h1 className="text-3xl font-extrabold text-foreground">{title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
-          <div className="mt-6">
-            <DemoNotice>
-              Frontend demo: no account is created or verified. Submitting opens the portal with
-              sample data.
-            </DemoNotice>
-          </div>
           <div className="mt-6">{children}</div>
         </div>
       </div>

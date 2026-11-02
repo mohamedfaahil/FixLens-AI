@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { FieldError, selectCls } from "@/components/fixlens/ui-bits";
-import { DEPARTMENTS, DEMO_STUDENT } from "@/lib/demo-data";
+import { DEPARTMENTS } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
 import { signUpStudent, resendStudentConfirmationEmail } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
@@ -62,19 +62,6 @@ function Register() {
   >({});
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF({ ...f, [k]: e.target.value });
-
-  const fillSample = () => {
-    setF({
-      name: DEMO_STUDENT.name,
-      email: DEMO_STUDENT.email,
-      department: DEMO_STUDENT.department,
-      phone: DEMO_STUDENT.phone,
-      password: "Password123",
-      confirm: "Password123",
-    });
-    setErr({});
-    toast.info("Sample student credentials pre-filled.");
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,22 +200,9 @@ function Register() {
               {resending ? "Sending link…" : "Resend confirmation email"}
             </Button>
           </div>
-
-          <div className="border-t border-blue-200/60 pt-3 dark:border-blue-900/40 text-[11px] text-blue-800/80 dark:text-blue-300/80">
-            <strong>Administrator Tip:</strong> To enable instant sign-up without email verification, open Supabase Dashboard &rarr; <em>Authentication</em> &rarr; <em>Providers</em> &rarr; <em>Email</em> &rarr; toggle <strong>Confirm email</strong> off.
-          </div>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4" noValidate>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={fillSample}
-            className="text-xs font-semibold text-primary underline hover:text-primary/80"
-          >
-            Auto-fill demo student details
-          </button>
-        </div>
         <TextField
           id="name"
           label="Full name"

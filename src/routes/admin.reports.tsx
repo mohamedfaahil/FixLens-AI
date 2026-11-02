@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Printer } from "lucide-react";
+import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DemoNotice, PageHeader, Panel } from "@/components/fixlens/ui-bits";
+import { PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { useDemoStore } from "@/lib/demo-store";
 import { CATEGORIES, PROPOSAL_STATUSES, STATUSES } from "@/lib/demo-data";
 import { detectRecurringIssues } from "@/lib/triage-engine";
 import { pageHead } from "@/lib/seo";
+import {
+  exportComplaintsToCSV,
+  exportProposalsToCSV,
+  exportAnalyticsSummaryToCSV,
+} from "@/lib/csv-export";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/reports")({
   head: () =>
@@ -32,7 +38,7 @@ function Bar({ label, value, max }: { label: string; value: number; max: number 
 }
 
 function Reports() {
-  const { complaints, proposals, isSupabaseConnected } = useDemoStore();
+  const { complaints, proposals } = useDemoStore();
   const byCat = CATEGORIES.map((c) => ({
     c,
     n: complaints.filter((x) => x.category === c).length,
@@ -47,20 +53,99 @@ function Reports() {
   const top = [...proposals].sort((a, b) => b.support - a.support).slice(0, 5);
   const recurring = detectRecurringIssues(complaints);
 
+  const handleExportComplaints = () => {
+    exportComplaintsToCSV(complaints);
+    toast.success(`Exported ${complaints.length} complaints to CSV.`);
+  };
+
+  const handleExportProposals = () => {
+    exportProposalsToCSV(proposals);
+    toast.success(`Exported ${proposals.length} proposals to CSV.`);
+  };
+
+  const handleExportSummary = () => {
+    const now = new Date();
+    const monthsMap: Record<string, { month: string; complaints: number; resolved: number }> = {};
+    const monthKeys: string[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleString("default", { month: "short" });
+      monthKeys.push(key);
+      monthsMap[key] = { month: label, complaints: 0, resolved: 0 };
+    }
+
+    for (const c of complaints) {
+      if (!c.date) continue;
+      const mKey = c.date.slice(0, 7);
+      if (monthsMap[mKey]) monthsMap[mKey].complaints++;
+      if (c.status === "Resolved") {
+        const resEvent = c.timeline?.find((t) => t.status === "Resolved");
+        const resDate = resEvent?.date || c.date;
+        const resMKey = resDate.slice(0, 7);
+        if (monthsMap[resMKey]) monthsMap[resMKey].resolved++;
+      }
+    }
+
+    const buildingCounts = Object.entries(
+      complaints.reduce<Record<string, number>>(
+        (acc, c) => ((acc[c.building] = (acc[c.building] || 0) + 1), acc),
+        {},
+      ),
+    ).map(([name, value]) => ({ name, value }));
+
+    const pendingCount = complaints.filter((c) => !["Resolved", "Rejected"].includes(c.status)).length;
+    const highPriPending = complaints.filter(
+      (c) => c.priority === "High" && !["Resolved", "Rejected"].includes(c.status),
+    ).length;
+
+    exportAnalyticsSummaryToCSV({
+      rangeDays: 180,
+      totalComplaints: complaints.length,
+      openCount: pendingCount,
+      resolvedCount: resolved,
+      resolutionRatePercent: complaints.length ? Math.round((resolved / complaints.length) * 100) : 0,
+      highPriorityPendingCount: highPriPending,
+      byCategory: byCat.map((x) => ({ name: x.c, value: x.n })),
+      byLocation: buildingCounts,
+      monthlyTrend: monthKeys.map((k) => monthsMap[k]),
+      recurringIssues: recurring.map((r) => ({
+        issue: r.issue,
+        location: r.location,
+        count: r.count,
+        category: r.category,
+      })),
+    });
+    toast.success("Executive planning summary exported to CSV.");
+  };
+
   return (
     <>
       <PageHeader
         title="Planning report"
         description="A one-page summary for campus planning meetings."
         actions={
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer /> Print
-          </Button>
+          <div className="no-print flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportComplaints} className="text-xs">
+              <FileSpreadsheet className="size-3.5 mr-1.5" />
+              Complaints CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportProposals} className="text-xs">
+              <FileSpreadsheet className="size-3.5 mr-1.5" />
+              Proposals CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportSummary} className="text-xs">
+              <Download className="size-3.5 mr-1.5" />
+              Summary CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="text-xs">
+              <Printer className="size-3.5 mr-1.5" />
+              Print
+            </Button>
+          </div>
         }
       />
-      {!isSupabaseConnected && (
-        <DemoNotice>Generated from sample demo data in this browser tab.</DemoNotice>
-      )}
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <Panel>
           <p className="text-xs text-muted-foreground">Total complaints</p>

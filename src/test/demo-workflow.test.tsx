@@ -12,8 +12,8 @@ describe("FixLens AI - Main Demo Workflow Verification", () => {
   it("verifies the complete 9-step MCA capstone workflow with shared in-memory state", () => {
     const { result } = renderHook(() => useDemoStore(), { wrapper });
 
-    // Step 1: Register or enter the student demo
-    expect(result.current.currentStudent.name).toBe("Aisha Rahman");
+    // Step 1: Register or enter the student profile
+    expect(result.current.currentStudent.name).toBe("");
     act(() => {
       result.current.setCurrentStudent({
         name: "Kavya Sharma",

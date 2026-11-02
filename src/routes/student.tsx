@@ -28,7 +28,7 @@ const nav: NavItem[] = [
 ];
 
 export function StudentLayout() {
-  const { currentStudent } = useDemoStore();
+  const { currentStudent, setCurrentStudent } = useDemoStore();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -38,9 +38,6 @@ export function StudentLayout() {
     const isTestMode =
       typeof process !== "undefined" &&
       (process.env.NODE_ENV === "test" || process.env.VITEST === "true");
-    const isExplicitDemo =
-      typeof sessionStorage !== "undefined" &&
-      sessionStorage.getItem("fixlens_demo_session") === "true";
 
     const verifyAccess = async () => {
       // 1. Strictly check if caller is an administrator account
@@ -60,12 +57,18 @@ export function StudentLayout() {
       const authState = await getStudentAuthState();
       if (!isMounted) return;
 
-      if (!authState.isAuthenticated && !isTestMode && !isExplicitDemo) {
+      if (!authState.isAuthenticated && !isTestMode) {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("fixlens_demo_session");
+        }
         setAuthorized(false);
         setChecking(false);
         toast.info("Please sign in to access the student portal.");
         navigate({ to: "/login" });
       } else {
+        if (authState.user) {
+          setCurrentStudent(authState.user);
+        }
         setAuthorized(true);
         setChecking(false);
       }
@@ -76,7 +79,7 @@ export function StudentLayout() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [navigate, setCurrentStudent]);
 
   if (checking) {
     return (

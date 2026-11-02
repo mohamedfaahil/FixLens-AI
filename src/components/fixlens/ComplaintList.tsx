@@ -1,19 +1,24 @@
 import { useMemo, useState } from "react";
-import { Search, ChevronRight, Image as ImageIcon, RotateCcw } from "lucide-react";
+import { Search, ChevronRight, Image as ImageIcon, RotateCcw, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { CATEGORIES, PRIORITIES, STATUSES, type Complaint } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
 import { detectRecurringIssues } from "@/lib/triage-engine";
 import { EmptyState, PriorityBadge, StatusBadge, formatDate, selectCls } from "./ui-bits";
+import { exportComplaintsToCSV } from "@/lib/csv-export";
+import { toast } from "sonner";
 
 export function ComplaintList({
   complaints,
   onOpen,
   showReporter,
+  showExport,
 }: {
   complaints: Complaint[];
   onOpen: (c: Complaint) => void;
   showReporter?: boolean;
+  showExport?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
@@ -49,7 +54,7 @@ export function ComplaintList({
 
   return (
     <div>
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_170px_150px_130px]">
+      <div className={`mb-4 grid gap-2 sm:grid-cols-2 ${showExport ? "lg:grid-cols-[1fr_160px_140px_130px_auto]" : "lg:grid-cols-[1fr_170px_150px_130px]"}`}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -93,6 +98,23 @@ export function ComplaintList({
             <option key={c}>{c}</option>
           ))}
         </select>
+        {showExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const dateStr = new Date().toISOString().slice(0, 10);
+              exportComplaintsToCSV(list, `fixlens_filtered_complaints_${dateStr}.csv`);
+              toast.success(`Exported ${list.length} filtered complaints to CSV.`);
+            }}
+            className="text-xs h-10 flex items-center gap-1.5"
+            disabled={list.length === 0}
+            title={list.length === 0 ? "No complaints match filters" : `Export ${list.length} filtered complaints to CSV`}
+          >
+            <Download className="size-3.5" />
+            Export CSV ({list.length})
+          </Button>
+        )}
       </div>
 
       {complaints.length === 0 ? (

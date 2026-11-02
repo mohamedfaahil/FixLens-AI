@@ -128,14 +128,16 @@ const ev = (
   by,
 });
 
-export const DEMO_STUDENT = {
-  id: "00000000-0000-0000-0000-000000000001",
-  name: "Aisha Rahman",
-  email: "aisha.rahman@campus.edu",
-  department: "Computer Applications (MCA)",
-  phone: "+91 98765 43210",
+export const EMPTY_STUDENT = {
+  id: "",
+  name: "",
+  email: "",
+  department: "",
+  phone: "",
   role: "student",
 };
+
+export const DEMO_STUDENT = EMPTY_STUDENT;
 
 export const DEMO_ADMIN = {
   name: "Facilities Administrator",
@@ -157,9 +159,9 @@ export const initialComplaints: Complaint[] = [
     priority: "High",
     status: "In Progress",
     date: "2026-10-21",
-    reporter: DEMO_STUDENT.name,
+    reporter: "Student Member",
     timeline: [
-      ev("Submitted", "2026-10-21", "Complaint received.", DEMO_STUDENT.name),
+      ev("Submitted", "2026-10-21", "Complaint received.", "Student Member"),
       ev("Under Review", "2026-10-22", "Assigned to IT network team."),
       ev("In Progress", "2026-10-23", "Access point replacement scheduled."),
     ],
@@ -176,10 +178,10 @@ export const initialComplaints: Complaint[] = [
     priority: "Medium",
     status: "Resolved",
     date: "2026-10-14",
-    reporter: DEMO_STUDENT.name,
+    reporter: "Student Member",
     resolutionNote: "Tap washer replaced and floor cleaned.",
     timeline: [
-      ev("Submitted", "2026-10-14", "Complaint received.", DEMO_STUDENT.name),
+      ev("Submitted", "2026-10-14", "Complaint received.", "Student Member"),
       ev("Under Review", "2026-10-14", "Plumber notified."),
       ev("In Progress", "2026-10-15", "Repair in progress."),
       ev("Resolved", "2026-10-16", "Tap washer replaced and floor cleaned."),
@@ -197,9 +199,9 @@ export const initialComplaints: Complaint[] = [
     priority: "Low",
     status: "Under Review",
     date: "2026-10-18",
-    reporter: DEMO_STUDENT.name,
+    reporter: "Student Member",
     timeline: [
-      ev("Submitted", "2026-10-18", "Complaint received.", DEMO_STUDENT.name),
+      ev("Submitted", "2026-10-18", "Complaint received.", "Student Member"),
       ev("Under Review", "2026-10-19", "Awaiting furniture inventory check."),
     ],
   },
@@ -379,7 +381,7 @@ export const initialProposals: Proposal[] = [
     location: "CS Block",
     support: 86,
     status: "Under Review",
-    author: DEMO_STUDENT.name,
+    author: "Student Member",
     date: "2026-10-12",
   },
   {

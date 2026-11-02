@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AsideCopy } from "@/components/fixlens/AuthAside";
-import { DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
 import {
   signInStudent,
@@ -106,12 +105,6 @@ export function Login() {
     }
   };
 
-  const fillDemo = () => {
-    setF({ email: DEMO_STUDENT.email, password: "password123" });
-    setErr({});
-    toast.info("Demo student credentials pre-filled.");
-  };
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const er: Partial<
@@ -160,20 +153,6 @@ export function Login() {
         return;
       }
 
-      // 2. Demo fallback if using sample demo student in offline/test environment
-      if (
-        f.email.toLowerCase() === DEMO_STUDENT.email.toLowerCase() &&
-        (res.error?.includes("Failed to connect") || res.error?.includes("Invalid login credentials") || res.error?.includes("fetch"))
-      ) {
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("fixlens_demo_session", "true");
-        }
-        setCurrentStudent(DEMO_STUDENT);
-        toast.info("Demo mode: signed in successfully. Opening student portal.");
-        nav({ to: "/student" });
-        return;
-      }
-
       if (res.isEmailUnconfirmed) {
         setUnconfirmedEmail(f.email.trim());
         setErr({ email: "Email confirmation required." });
@@ -218,21 +197,9 @@ export function Login() {
               {resending ? "Sending link…" : "Resend confirmation email"}
             </Button>
           </div>
-          <div className="mt-3 border-t border-amber-200/60 pt-2 text-[11px] text-amber-800/80 dark:text-amber-300/80">
-            <strong>Administrator Tip:</strong> You can confirm this user directly in Supabase Dashboard &rarr; <em>Authentication</em> &rarr; <em>Users</em> &rarr; <em>&hellip; (User menu)</em> &rarr; <em>Confirm email</em>, or disable <em>Confirm email</em> under Providers for automatic confirmation.
-          </div>
         </div>
       )}
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={fillDemo}
-            className="text-xs font-semibold text-primary underline hover:text-primary/80"
-          >
-            Auto-fill demo credentials
-          </button>
-        </div>
         <TextField
           id="email"
           label="Campus email"

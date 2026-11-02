@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, Check, CheckCheck, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -14,38 +14,98 @@ import {
   markAllNotificationsReadInSupabase,
 } from "@/lib/supabase-data";
 import { useDemoStore } from "@/lib/demo-store";
-import { DEMO_STUDENT } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 
 export function NotificationsBell({ portal = "Student" }: { portal?: "Student" | "Administrator" }) {
-  const { currentStudent, isSupabaseConnected, adminAlerts, acknowledgeAlert } = useDemoStore();
+  const {
+    currentStudent,
+    isSupabaseConnected,
+    adminAlerts,
+    acknowledgeAlert,
+    notifications: storeNotifications,
+    markStudentNotificationAsRead,
+    markAllStudentNotificationsAsRead,
+  } = useDemoStore();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const recentlyReadIdsRef = useRef<Set<string>>(new Set());
 
-  const userId = currentStudent.id && currentStudent.id !== DEMO_STUDENT.id ? currentStudent.id : undefined;
+  const userId = currentStudent?.id || undefined;
   const isAdmin = portal === "Administrator";
 
-  const loadNotifications = useCallback(async () => {
-    if (isAdmin || !userId) return;
-    setLoading(true);
-    try {
-      const data = await fetchNotificationsFromSupabase(userId);
-      setNotifications(data);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, userId]);
+  // Merge remote Supabase notifications with in-memory / local submission & demo notifications
+  const mergeNotifications = useCallback(
+    (remote: AppNotification[], local: AppNotification[]): AppNotification[] => {
+      const map = new Map<string, AppNotification>();
+      for (const item of local) {
+        map.set(item.id, item);
+      }
+      for (const item of remote) {
+        // If user recently marked as read in session, preserve read state
+        const shouldBeRead = item.isRead || recentlyReadIdsRef.current.has(item.id);
+        map.set(item.id, { ...item, isRead: shouldBeRead });
+      }
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    },
+    [],
+  );
 
+  const loadNotifications = useCallback(
+    async (silent = false) => {
+      if (isAdmin) return;
+      if (!userId || !isSupabaseConnected) {
+        // Demo / offline mode: use store notifications directly
+        setNotifications(storeNotifications);
+        return;
+      }
+      if (!silent) setLoading(true);
+      try {
+        const remoteData = await fetchNotificationsFromSupabase(userId);
+        setNotifications(mergeNotifications(remoteData, storeNotifications));
+      } catch {
+        setNotifications(storeNotifications);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [isAdmin, userId, isSupabaseConnected, storeNotifications, mergeNotifications],
+  );
+
+  // Initial load and sync with store changes
   useEffect(() => {
-    if (!isAdmin && userId) {
+    if (!isAdmin) {
       loadNotifications();
     }
-  }, [isAdmin, userId, loadNotifications]);
+  }, [isAdmin, userId, isSupabaseConnected, storeNotifications, loadNotifications]);
+
+  // Phase 3: Automatic Notification Refresh on Window Focus and 30-Second Interval
+  useEffect(() => {
+    if (isAdmin) return;
+
+    const handleFocus = () => {
+      loadNotifications(true);
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadNotifications(true);
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(intervalId);
+    };
+  }, [isAdmin, loadNotifications]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen && !isAdmin && userId) {
+    if (nextOpen && !isAdmin) {
       loadNotifications();
     }
   };
@@ -56,10 +116,14 @@ export function NotificationsBell({ portal = "Student" }: { portal?: "Student" |
       acknowledgeAlert(id);
       return;
     }
+    recentlyReadIdsRef.current.add(id);
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
     );
-    await markNotificationReadInSupabase(id);
+    markStudentNotificationAsRead(id);
+    if (userId && isSupabaseConnected) {
+      await markNotificationReadInSupabase(id);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -69,18 +133,17 @@ export function NotificationsBell({ portal = "Student" }: { portal?: "Student" |
       });
       return;
     }
-    if (!userId) return;
+    notifications.forEach((n) => recentlyReadIdsRef.current.add(n.id));
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await markAllNotificationsReadInSupabase(userId);
+    markAllStudentNotificationsAsRead();
+    if (userId && isSupabaseConnected) {
+      await markAllNotificationsReadInSupabase(userId);
+    }
   };
 
   const unreadCount = isAdmin
     ? adminAlerts.filter((a) => a.status === "New").length
     : notifications.filter((n) => !n.isRead).length;
-
-  if (!isAdmin && !isSupabaseConnected && !userId) {
-    return null;
-  }
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>

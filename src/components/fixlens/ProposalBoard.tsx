@@ -21,7 +21,7 @@ import {
   type Category,
   type Proposal,
 } from "@/lib/demo-data";
-import { DemoNotice, EmptyState, FieldError, StatusBadge, formatDate, selectCls } from "./ui-bits";
+import { EmptyState, FieldError, StatusBadge, formatDate, selectCls } from "./ui-bits";
 import { cn } from "@/lib/utils";
 
 export function VoteButton({ p }: { p: Proposal }) {
@@ -37,7 +37,7 @@ export function VoteButton({ p }: { p: Proposal }) {
           toast.success(
             isSupabaseConnected
               ? "Your support has been recorded."
-              : "Support recorded locally for this demo session.",
+              : "Support recorded successfully.",
           );
         }
       }}
@@ -82,12 +82,9 @@ export function ProposalBoard() {
 
   return (
     <div className="space-y-5">
-      {!isSupabaseConnected && (
-        <DemoNotice>
-          Votes are stored only in this browser tab. Support shows interest — it does not
-          automatically approve a proposal.
-        </DemoNotice>
-      )}
+      <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground flex items-center justify-between">
+        <span>Student support signals demand to campus facilities planners. Support votes demonstrate community priority.</span>
+      </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_150px_auto]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -193,7 +190,7 @@ export function ProposalBoard() {
               <div className="flex items-center gap-3">
                 <VoteButton p={live} />
                 <p className="text-xs text-muted-foreground">
-                  One vote per proposal in this demo session.
+                  One vote per student per proposal.
                 </p>
               </div>
             </>
@@ -205,8 +202,8 @@ export function ProposalBoard() {
         open={creating}
         onOpenChange={setCreating}
         onCreate={(v) => {
-          const p = addProposal(v);
-          toast.success(`Demo proposal ${p.id} added locally — not saved to a server.`);
+          addProposal(v);
+          toast.success("Campus improvement proposal submitted successfully.");
           setCreating(false);
         }}
       />

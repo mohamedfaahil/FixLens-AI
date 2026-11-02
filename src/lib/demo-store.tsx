@@ -4,7 +4,7 @@ import { generateUniqueComplaintId } from "./id-generator";
 import {
   initialComplaints,
   initialProposals,
-  DEMO_STUDENT,
+  EMPTY_STUDENT,
   type Complaint,
   type FollowUpNote,
   type TimelineEvent,
@@ -26,6 +26,7 @@ import {
   fetchAnomaliesFromSupabase,
   updateAnomalyStatusInSupabase,
   recordEscalationInSupabase,
+  type AppNotification,
 } from "./supabase-data";
 import { getStudentAuthState, getAdminAuthState } from "./supabase-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,6 +103,11 @@ export interface Store {
   updateAnomalyStatus: (id: string, status: AnomalyStatus, notes?: string) => void;
   acknowledgeAlert: (id: string) => void;
   resolveAlert: (id: string) => void;
+  // Phase 3: Smart Notifications
+  notifications: AppNotification[];
+  addStudentNotification: (n: Omit<AppNotification, "id" | "createdAt" | "isRead">) => void;
+  markStudentNotificationAsRead: (id: string) => void;
+  markAllStudentNotificationsAsRead: () => void;
   // Supabase synchronization
   isSupabaseConnected: boolean;
   isLoading: boolean;
@@ -119,18 +125,94 @@ function logStoreNotice(msg: string, ...args: unknown[]) {
   if (!isTestMode) console.warn(msg, ...args);
 }
 
+// ====================================================================
+// PHASE 3: SMART NOTIFICATIONS & ADMIN ALERT PERSISTENCE HELPERS
+// ====================================================================
+
+const ADMIN_ALERTS_KEY_PREFIX = "fixlens_admin_alerts_";
+const STUDENT_NOTIFS_KEY_PREFIX = "fixlens_student_notifs_";
+
+export function getAdminAlertsStorageKey(adminEmail?: string): string {
+  const cleanEmail = (adminEmail || "demo").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  return `${ADMIN_ALERTS_KEY_PREFIX}${cleanEmail}`;
+}
+
+export function loadPersistedAdminAlerts(adminEmail?: string): AdminAlert[] {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(getAdminAlertsStorageKey(adminEmail));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePersistedAdminAlerts(alerts: AdminAlert[], adminEmail?: string) {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(getAdminAlertsStorageKey(adminEmail), JSON.stringify(alerts));
+  } catch {
+    // Ignore storage quota or access errors
+  }
+}
+
+export const DEFAULT_STUDENT_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "notif-welcome-1",
+    title: "Welcome to FixLens AI",
+    message: "Report campus maintenance issues and receive intelligent priority recommendations.",
+    type: "info",
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export function getStudentNotifsStorageKey(userId?: string): string {
+  const cleanId = (userId || "demo").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  return `${STUDENT_NOTIFS_KEY_PREFIX}${cleanId}`;
+}
+
+export function loadPersistedStudentNotifs(userId?: string): AppNotification[] {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return DEFAULT_STUDENT_NOTIFICATIONS;
+  }
+  try {
+    const raw = localStorage.getItem(getStudentNotifsStorageKey(userId));
+    return raw ? JSON.parse(raw) : DEFAULT_STUDENT_NOTIFICATIONS;
+  } catch {
+    return DEFAULT_STUDENT_NOTIFICATIONS;
+  }
+}
+
+export function savePersistedStudentNotifs(notifs: AppNotification[], userId?: string) {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(getStudentNotifsStorageKey(userId), JSON.stringify(notifs));
+  } catch {
+    // Ignore storage quota or access errors
+  }
+}
+
 export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
   const [votedIds, setVoted] = useState<string[]>([]);
-  const [currentStudent, setCurrentStudent] = useState<StudentUser>(DEMO_STUDENT);
+  const [currentStudent, setCurrentStudent] = useState<StudentUser>(EMPTY_STUDENT);
   const [reportDraft, setReportDraft] = useState<ReportDraft | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeAdminEmail, setActiveAdminEmail] = useState<string | null>(null);
 
-  // Phase 2: Lifecycle overrides for anomalies and alerts
+  // Phase 2: Lifecycle overrides for anomalies and alerts (persisted per admin account across refresh)
   const [persistedAnomalies, setPersistedAnomalies] = useState<MaintenanceAnomaly[]>([]);
-  const [persistedAlerts, setPersistedAlerts] = useState<AdminAlert[]>([]);
+  const [persistedAlerts, setPersistedAlerts] = useState<AdminAlert[]>(() =>
+    loadPersistedAdminAlerts(),
+  );
+
+  // Phase 3: In-memory & demo student notifications
+  const [studentNotifications, setStudentNotifications] = useState<AppNotification[]>(() =>
+    loadPersistedStudentNotifs(),
+  );
 
   // Synthesize dynamic alerts, anomalies and escalations from live complaints
   const alertsSnapshot = useMemo(() => {
@@ -140,9 +222,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const updateAlertStatus = (id: string, status: AlertStatus, notes?: string) => {
     const nowStr = new Date().toISOString();
     setPersistedAlerts((prev) => {
+      let next: AdminAlert[];
       const existing = prev.find((a) => a.id === id);
       if (existing) {
-        return prev.map((a) =>
+        next = prev.map((a) =>
           a.id === id
             ? {
                 ...a,
@@ -152,26 +235,69 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
               }
             : a,
         );
+      } else {
+        const match = alertsSnapshot.alerts.find((a) => a.id === id);
+        if (match) {
+          next = [
+            ...prev,
+            {
+              ...match,
+              status,
+              adminNotes: notes,
+              resolvedAt: status === "Resolved" ? nowStr : undefined,
+            },
+          ];
+        } else {
+          next = prev;
+        }
       }
-      const match = alertsSnapshot.alerts.find((a) => a.id === id);
-      if (match) {
-        return [
-          ...prev,
-          {
-            ...match,
-            status,
-            adminNotes: notes,
-            resolvedAt: status === "Resolved" ? nowStr : undefined,
-          },
-        ];
-      }
-      return prev;
+      savePersistedAdminAlerts(next, activeAdminEmail || undefined);
+      return next;
     });
 
     if (id.startsWith("alert-anom-")) {
       const anomId = id.replace("alert-anom-", "");
       updateAnomalyStatus(anomId, status as AnomalyStatus, notes);
     }
+  };
+
+  const addStudentNotification = (
+    n: Omit<AppNotification, "id" | "createdAt" | "isRead">,
+  ) => {
+    const newNotif: AppNotification = {
+      id: `notif-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      userId: currentStudent.id,
+      ...n,
+    };
+    setStudentNotifications((prev) => {
+      const isDuplicate = prev.some(
+        (existing) =>
+          existing.referenceId === newNotif.referenceId &&
+          existing.title === newNotif.title,
+      );
+      if (isDuplicate) return prev;
+      const next = [newNotif, ...prev];
+      savePersistedStudentNotifs(next, currentStudent.id);
+      return next;
+    });
+  };
+
+  const markStudentNotificationAsRead = (id: string) => {
+    setStudentNotifications((prev) => {
+      const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      savePersistedStudentNotifs(next, currentStudent.id);
+      return next;
+    });
+  };
+
+  const markAllStudentNotificationsAsRead = () => {
+    setStudentNotifications((prev) => {
+      const next = prev.map((n) => ({ ...n, isRead: true }));
+      savePersistedStudentNotifs(next, currentStudent.id);
+      return next;
+    });
   };
 
   const updateAnomalyStatus = (id: string, status: AnomalyStatus, notes?: string) => {
@@ -234,11 +360,35 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       if (studentAuth.isAuthenticated && studentAuth.user) {
         setCurrentStudent(studentAuth.user);
       } else {
-        setCurrentStudent(DEMO_STUDENT);
+        setCurrentStudent(EMPTY_STUDENT);
       }
 
       const activeUserId = studentAuth.isAuthenticated ? studentAuth.user?.id : undefined;
       const isAdmin = adminAuth.isAuthenticated;
+
+      if (adminAuth.isAuthenticated && adminAuth.email) {
+        setActiveAdminEmail(adminAuth.email);
+        const storedAlerts = loadPersistedAdminAlerts(adminAuth.email);
+        if (storedAlerts && storedAlerts.length > 0) {
+          setPersistedAlerts(storedAlerts);
+        }
+        try {
+          const remoteAnomalies = await fetchAnomaliesFromSupabase();
+          if (remoteAnomalies && remoteAnomalies.length > 0) {
+            setPersistedAnomalies(remoteAnomalies);
+          }
+        } catch (err) {
+          logStoreNotice("[Demo Store] Failed to sync anomalies:", err);
+        }
+      }
+
+      if (studentAuth.isAuthenticated && studentAuth.user) {
+        setCurrentStudent(studentAuth.user);
+        const storedNotifs = loadPersistedStudentNotifs(studentAuth.user.id);
+        if (storedNotifs && storedNotifs.length > 0) {
+          setStudentNotifications(storedNotifs);
+        }
+      }
 
       const [remoteComplaints, remoteProposals, remoteVotes] = await Promise.all([
         fetchComplaintsFromSupabase({
@@ -279,10 +429,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         if (studentAuth.isAuthenticated && studentAuth.user) {
           setCurrentStudent(studentAuth.user);
         } else {
-          setCurrentStudent(DEMO_STUDENT);
+          setCurrentStudent(EMPTY_STUDENT);
         }
       } else {
-        setCurrentStudent(DEMO_STUDENT);
+        setCurrentStudent(EMPTY_STUDENT);
       }
       refreshData();
     });
@@ -313,6 +463,11 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     updateAnomalyStatus,
     acknowledgeAlert,
     resolveAlert,
+    // Phase 3: Smart Notifications
+    notifications: studentNotifications,
+    addStudentNotification,
+    markStudentNotificationAsRead,
+    markAllStudentNotificationsAsRead,
 
     addFollowUp: (complaintId, content) => {
       const trimmed = content.trim();
@@ -346,7 +501,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setComplaints((xs) => xs.map((c) => (c.id === complaintId ? updated : c)));
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
+      if (currentStudent.id) {
         addFollowUpInSupabase(complaintId, trimmed, currentStudent).catch((err) => {
           logStoreNotice("[Demo Store] Follow-up Supabase sync notice:", err);
           if (!isTestMode) {
@@ -386,7 +541,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
 
       // Supabase persistence promise
       const persistPromise: Promise<Complaint> = (async () => {
-        if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
+        if (currentStudent.id) {
           try {
             const persisted = await createComplaintInSupabase(
               { ...c, id: uniqueId },
@@ -394,6 +549,21 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
               imageFile,
             );
             setComplaints((xs) => xs.map((comp) => (comp.id === uniqueId ? persisted : comp)));
+            // Dispatch student submission & recurrence notifications ONLY after persistence succeeds
+            addStudentNotification({
+              title: `Complaint Submitted: ${persisted.title}`,
+              message: `Your complaint (${persisted.id}) has been recorded and submitted for campus maintenance review.`,
+              type: "info",
+              referenceId: persisted.id,
+            });
+            if (persisted.linkedComplaintId) {
+              addStudentNotification({
+                title: `Recurring Issue Linked`,
+                message: `Your report has been linked to recurring incident ${persisted.linkedComplaintId}. It will be tracked as part of the existing maintenance ticket.`,
+                type: "duplicate_alert",
+                referenceId: persisted.id,
+              });
+            }
             return persisted;
           } catch (err) {
             // Revert optimistic complaint upon failure
@@ -406,6 +576,21 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
             }
             throw err;
           }
+        }
+        // In-memory demo mode: dispatch submission and recurrence notifications
+        addStudentNotification({
+          title: `Complaint Submitted: ${item.title}`,
+          message: `Your complaint (${item.id}) has been recorded.`,
+          type: "info",
+          referenceId: item.id,
+        });
+        if (item.linkedComplaintId) {
+          addStudentNotification({
+            title: `Recurring Issue Linked`,
+            message: `Your report has been linked to recurring incident ${item.linkedComplaintId}. It will be tracked as part of the existing maintenance ticket.`,
+            type: "duplicate_alert",
+            referenceId: item.id,
+          });
         }
         return item;
       })();
@@ -421,6 +606,40 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     },
 
     updateComplaint: (id, patch) => {
+      const target = complaints.find((c) => c.id === id);
+      const trimmedNote = patch.note?.trim();
+      const statusChanged = Boolean(patch.status && target && patch.status !== target.status);
+
+      // Detect genuine operational priority escalation vs status change for student notifications
+      if (target) {
+        const PRIORITY_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+        const newPriority = patch.priority || patch.escalatedPriority;
+        const oldPriority = target.priority || "Low";
+        const isGenuineEscalation = Boolean(
+          newPriority && (PRIORITY_RANK[newPriority] ?? 0) > (PRIORITY_RANK[oldPriority] ?? 0),
+        );
+
+        if (isGenuineEscalation) {
+          const reasons = patch.escalationReasons?.length
+            ? ` Reasons: ${patch.escalationReasons.join(", ")}.`
+            : "";
+          const noteText = trimmedNote ? ` Note: ${trimmedNote}` : "";
+          addStudentNotification({
+            title: `Priority Escalated: ${target.title || id}`,
+            message: `Operational priority has been escalated to ${newPriority}.${reasons}${noteText}`,
+            type: "status_update",
+            referenceId: id,
+          });
+        } else if (statusChanged) {
+          addStudentNotification({
+            title: `Complaint ${id} Updated`,
+            message: `Status changed to ${patch.status}.${trimmedNote ? ` Note: ${trimmedNote}` : ""}`,
+            type: "status_update",
+            referenceId: id,
+          });
+        }
+      }
+
       setComplaints((xs) =>
         xs.map((c) => {
           if (c.id !== id) return c;
@@ -432,12 +651,10 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
           if (patch.escalatedPriority) next.escalatedPriority = patch.escalatedPriority;
           if (patch.escalationReasons) next.escalationReasons = patch.escalationReasons;
           if (patch.isAdminOverride !== undefined) next.isAdminOverride = patch.isAdminOverride;
-          const trimmedNote = patch.note?.trim();
           if (trimmedNote) {
             next.resolutionNote = trimmedNote;
           }
 
-          const statusChanged = Boolean(patch.status && patch.status !== c.status);
           if (statusChanged) {
             next.status = patch.status!;
             next.timeline = [
@@ -460,6 +677,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
               },
             ];
           }
+
           return next;
         }),
       );
@@ -488,7 +706,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setVoted((v) => [...v, item.id]);
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
+      if (currentStudent.id) {
         createProposalInSupabase({ ...p, id: item.id }, currentStudent)
           .then((persisted) => {
             setProposals((xs) => xs.map((prop) => (prop.id === item.id ? persisted : prop)));
@@ -513,7 +731,7 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setProposals((xs) => xs.map((p) => (p.id === id ? { ...p, support: p.support + 1 } : p)));
 
       // Asynchronously persist to Supabase
-      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
+      if (currentStudent.id) {
         voteProposalInSupabase(id, currentStudent.id).catch((err) => {
           logStoreNotice("[Demo Store] Vote Supabase sync notice:", err);
           if (!isTestMode) {
@@ -526,10 +744,13 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     },
 
     reviewProposal: (id, status, note) => {
+      const target = proposals.find((p) => p.id === id);
+      const statusChanged = target && target.status !== status;
+      const trimmedNote = note.trim();
+
       setProposals((xs) =>
         xs.map((p) => {
           if (p.id !== id) return p;
-          const trimmedNote = note.trim();
           return {
             ...p,
             status,
@@ -537,6 +758,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       );
+
+      // Dispatch proposal decision notification to relevant student
+      if (target && (statusChanged || trimmedNote)) {
+        addStudentNotification({
+          title: `Proposal Decision: ${target.title}`,
+          message: `Your campus improvement proposal status has been updated to "${status}"${trimmedNote ? `: "${trimmedNote}"` : "."}`,
+          type: "proposal",
+          referenceId: target.id,
+        });
+      }
 
       // Asynchronously update in Supabase
       reviewProposalInSupabase(id, status, note).catch((err) => {
@@ -550,7 +781,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setVoted([]);
       setPersistedAnomalies([]);
       setPersistedAlerts([]);
-      setCurrentStudent(DEMO_STUDENT);
+      setStudentNotifications(DEFAULT_STUDENT_NOTIFICATIONS);
+      if (typeof localStorage !== "undefined") {
+        try {
+          localStorage.removeItem(getAdminAlertsStorageKey());
+          localStorage.removeItem(getStudentNotifsStorageKey());
+        } catch {
+          // Ignore
+        }
+      }
+      setCurrentStudent(EMPTY_STUDENT);
       setReportDraft(null);
     },
   };
@@ -566,7 +806,7 @@ export function useDemoStore() {
       complaints: initialComplaints,
       proposals: initialProposals,
       votedIds: [],
-      currentStudent: DEMO_STUDENT,
+      currentStudent: EMPTY_STUDENT,
       setCurrentStudent: () => {},
       reportDraft: null,
       setReportDraft: () => {},
@@ -586,6 +826,10 @@ export function useDemoStore() {
       updateAnomalyStatus: () => {},
       acknowledgeAlert: () => {},
       resolveAlert: () => {},
+      notifications: DEFAULT_STUDENT_NOTIFICATIONS,
+      addStudentNotification: () => {},
+      markStudentNotificationAsRead: () => {},
+      markAllStudentNotificationsAsRead: () => {},
       isSupabaseConnected: false,
       isLoading: false,
       refreshData: async () => {},
