@@ -22,16 +22,22 @@ export const Route = createFileRoute("/admin/queue")({
 const rank: Record<Priority, number> = { High: 3, Medium: 2, Low: 1 };
 
 function Queue() {
-  const { complaints, isSupabaseConnected } = useDemoStore();
+  const { complaints, escalatedComplaints, isSupabaseConnected } = useDemoStore();
   const nav = useNavigate();
   const open = complaints
     .filter((c) => !["Resolved", "Rejected"].includes(c.status))
-    .map((c) => ({
-      c,
-      pred: {
-        priority: c.predictedPriority || c.priority || demoPredictPriority(c).priority,
-      },
-    }))
+    .map((c) => {
+      const esc = escalatedComplaints.find((e) => e.complaintId === c.id);
+      const suggestedPriority =
+        esc?.escalatedPriority || c.predictedPriority || c.priority || demoPredictPriority(c).priority;
+      return {
+        c,
+        esc,
+        pred: {
+          priority: suggestedPriority,
+        },
+      };
+    })
     .sort((a, b) => rank[b.pred.priority] - rank[a.pred.priority] || b.c.affected - a.c.affected);
 
   return (
@@ -86,14 +92,26 @@ function Queue() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {open.map(({ c, pred }) => (
+                {open.map(({ c, esc, pred }) => (
                   <tr
                     key={c.id}
                     onClick={() => nav({ to: "/admin/complaints/$id", params: { id: c.id } })}
                     className="cursor-pointer hover:bg-muted"
                   >
                     <td className="py-3 pr-3">
-                      <p className="font-semibold text-foreground">{c.title}</p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="font-semibold text-foreground">{c.title}</p>
+                        {esc?.isEscalated && (
+                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                            Escalated
+                          </span>
+                        )}
+                        {esc?.isSafetyCritical && (
+                          <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-bold text-destructive">
+                            Hazard
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {c.id} · {c.building} · {formatDate(c.date)}
                       </p>

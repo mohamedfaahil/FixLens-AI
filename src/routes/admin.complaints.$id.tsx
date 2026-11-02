@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { EmptyState, PageHeader, Panel, selectCls } from "@/components/fixlens/ui-bits";
 import { ComplaintSummary } from "@/components/fixlens/ComplaintDetail";
 import { PredictionCard } from "@/components/fixlens/PriorityPanel";
+import { ComplaintEscalationDetail } from "@/components/fixlens/ComplaintEscalationDetail";
 import { useDemoStore } from "@/lib/demo-store";
 import {
   demoPredictPriority,
@@ -127,9 +128,12 @@ function AdminDetail() {
       <div className="mb-2">{back}</div>
       <PageHeader title={c.title} />
       <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <Panel>
-          <ComplaintSummary c={c} />
-        </Panel>
+        <div className="space-y-5">
+          <Panel>
+            <ComplaintSummary c={c} />
+          </Panel>
+          <ComplaintEscalationDetail c={c} />
+        </div>
         <div className="space-y-5">
           <Panel title="Update complaint">
             <form onSubmit={save} className="space-y-3">

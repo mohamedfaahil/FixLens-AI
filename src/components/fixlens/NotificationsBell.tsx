@@ -17,16 +17,17 @@ import { useDemoStore } from "@/lib/demo-store";
 import { DEMO_STUDENT } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 
-export function NotificationsBell() {
-  const { currentStudent, isSupabaseConnected } = useDemoStore();
+export function NotificationsBell({ portal = "Student" }: { portal?: "Student" | "Administrator" }) {
+  const { currentStudent, isSupabaseConnected, adminAlerts, acknowledgeAlert } = useDemoStore();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
   const userId = currentStudent.id && currentStudent.id !== DEMO_STUDENT.id ? currentStudent.id : undefined;
+  const isAdmin = portal === "Administrator";
 
   const loadNotifications = useCallback(async () => {
-    if (!userId) return;
+    if (isAdmin || !userId) return;
     setLoading(true);
     try {
       const data = await fetchNotificationsFromSupabase(userId);
@@ -34,23 +35,27 @@ export function NotificationsBell() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [isAdmin, userId]);
 
   useEffect(() => {
-    if (userId) {
+    if (!isAdmin && userId) {
       loadNotifications();
     }
-  }, [userId, loadNotifications]);
+  }, [isAdmin, userId, loadNotifications]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen && userId) {
+    if (nextOpen && !isAdmin && userId) {
       loadNotifications();
     }
   };
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    if (isAdmin) {
+      acknowledgeAlert(id);
+      return;
+    }
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
     );
@@ -58,14 +63,22 @@ export function NotificationsBell() {
   };
 
   const handleMarkAllRead = async () => {
+    if (isAdmin) {
+      adminAlerts.forEach((a) => {
+        if (a.status === "New") acknowledgeAlert(a.id);
+      });
+      return;
+    }
     if (!userId) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     await markAllNotificationsReadInSupabase(userId);
   };
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = isAdmin
+    ? adminAlerts.filter((a) => a.status === "New").length
+    : notifications.filter((n) => !n.isRead).length;
 
-  if (!isSupabaseConnected && !userId) {
+  if (!isAdmin && !isSupabaseConnected && !userId) {
     return null;
   }
 
@@ -109,21 +122,42 @@ export function NotificationsBell() {
         </div>
 
         <div className="max-h-80 overflow-y-auto divide-y">
-          {loading && notifications.length === 0 ? (
+          {loading && !isAdmin && notifications.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
               <Loader2 className="size-4 animate-spin mr-2" />
               Loading notifications…
             </div>
-          ) : notifications.length === 0 ? (
+          ) : (isAdmin ? adminAlerts.length === 0 : notifications.length === 0) ? (
             <div className="py-8 px-4 text-center">
               <Bell className="size-8 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-xs font-medium text-foreground">No notifications yet</p>
+              <p className="text-xs font-medium text-foreground">
+                {isAdmin ? "No active alerts" : "No notifications yet"}
+              </p>
               <p className="text-[11px] text-muted-foreground mt-1">
-                You will receive updates here when your complaints change status.
+                {isAdmin
+                  ? "Campus maintenance alerts and escalations will appear here."
+                  : "You will receive updates here when your complaints change status."}
               </p>
             </div>
           ) : (
-            notifications.map((item) => (
+            (isAdmin
+              ? adminAlerts.map((a) => ({
+                  id: a.id,
+                  title: a.title,
+                  message: a.description,
+                  isRead: a.status !== "New",
+                  createdAt: a.detectedAt,
+                  complaintId: a.complaintId,
+                }))
+              : notifications.map((n) => ({
+                  id: n.id,
+                  title: n.title,
+                  message: n.message,
+                  isRead: n.isRead,
+                  createdAt: n.createdAt,
+                  complaintId: n.referenceId,
+                }))
+            ).map((item) => (
               <div
                 key={item.id}
                 className={cn(
@@ -146,17 +180,17 @@ export function NotificationsBell() {
                   </div>
                   <p className="text-muted-foreground leading-relaxed">{item.message}</p>
                   <div className="flex items-center justify-between pt-1">
-                    {item.referenceId ? (
+                    {item.complaintId ? (
                       <Link
-                        to="/student/complaints/$id"
-                        params={{ id: item.referenceId }}
+                        to={isAdmin ? "/admin/complaints/$id" : "/student/complaints/$id"}
+                        params={{ id: item.complaintId }}
                         onClick={() => {
                           if (!item.isRead) handleMarkAsRead(item.id);
                           setOpen(false);
                         }}
                         className="text-[11px] font-semibold text-primary hover:underline"
                       >
-                        View complaint &rarr;
+                        View ticket &rarr;
                       </Link>
                     ) : (
                       <span />
@@ -168,7 +202,7 @@ export function NotificationsBell() {
                         className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                       >
                         <Check className="size-3" />
-                        Mark read
+                        {isAdmin ? "Acknowledge" : "Mark read"}
                       </button>
                     )}
                   </div>

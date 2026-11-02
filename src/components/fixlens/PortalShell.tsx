@@ -113,7 +113,7 @@ export function PortalShell({ nav, portal, user, children }: Props) {
             <Logo to="/" />
           </span>
           <div className="ml-auto flex items-center gap-3">
-            {portal === "Student" && <NotificationsBell />}
+            <NotificationsBell portal={portal} />
             {isSupabaseConnected ? (
               <>
                 <span className="hidden text-xs text-muted-foreground sm:inline">

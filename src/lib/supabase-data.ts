@@ -9,6 +9,8 @@ import type {
   Status,
   TimelineEvent,
 } from "./demo-data";
+import type { MaintenanceAnomaly, AnomalyStatus } from "./anomaly-engine";
+import type { EscalationAuditRecord } from "./escalation-engine";
 
 // In-memory cache for resolved signed URLs to avoid duplicate network fetches
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
@@ -597,7 +599,14 @@ export async function createComplaintInSupabase(
  */
 export async function updateComplaintInSupabase(
   id: string,
-  patch: { status?: Status; priority?: Priority; note?: string },
+  patch: {
+    status?: Status;
+    priority?: Priority;
+    note?: string;
+    escalatedPriority?: Priority;
+    escalationReasons?: string[];
+    isAdminOverride?: boolean;
+  },
   adminName: string = "FixLens Administrator",
 ): Promise<void> {
   const updateData: Record<string, unknown> = {
@@ -605,7 +614,13 @@ export async function updateComplaintInSupabase(
   };
 
   if (patch.status) updateData.status = patch.status;
-  if (patch.priority) updateData.priority = patch.priority;
+  if (patch.priority) {
+    updateData.priority = patch.priority;
+    updateData.is_admin_override = true;
+  }
+  if (patch.escalatedPriority) updateData.escalated_priority = patch.escalatedPriority;
+  if (patch.escalationReasons) updateData.escalation_reasons = patch.escalationReasons;
+  if (patch.isAdminOverride !== undefined) updateData.is_admin_override = patch.isAdminOverride;
   if (patch.note && patch.note.trim()) {
     updateData.resolution_note = patch.note.trim();
   }
@@ -926,5 +941,90 @@ export async function markAllNotificationsReadInSupabase(userId: string): Promis
     await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId);
   } catch (err) {
     logWarning("[Supabase Data] Mark all notifications error:", err);
+  }
+}
+
+// ====================================================================
+// PHASE 2: ESCALATIONS & ANOMALIES DATA OPERATIONS
+// ====================================================================
+
+/**
+ * Records a complaint priority escalation audit record in Supabase.
+ */
+export async function recordEscalationInSupabase(audit: EscalationAuditRecord): Promise<void> {
+  try {
+    await supabase.from("complaint_escalations").insert({
+      id: audit.id,
+      complaint_id: audit.complaintId,
+      previous_priority: audit.previousPriority,
+      escalated_priority: audit.escalatedPriority,
+      reasons: audit.reasons,
+      trigger_types: audit.triggerTypes,
+      factors: audit.factors,
+      admin_reviewed: audit.adminReviewed,
+      created_at: audit.timestamp,
+    });
+  } catch (err) {
+    logWarning("[Supabase Data] Escalation record notice:", err);
+  }
+}
+
+/**
+ * Fetches campus maintenance anomalies from Supabase.
+ */
+export async function fetchAnomaliesFromSupabase(): Promise<MaintenanceAnomaly[]> {
+  try {
+    const { data, error } = await supabase
+      .from("maintenance_anomalies")
+      .select("*")
+      .order("detected_at", { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      anomalyType: row.anomaly_type as any,
+      severity: row.severity as Priority,
+      building: row.building,
+      room: row.room || undefined,
+      category: row.category as any,
+      description: row.description,
+      evidence: row.evidence || [],
+      contributingComplaintIds: row.contributing_complaint_ids || [],
+      distinctReporters: row.distinct_reporters,
+      incidentCount: row.incident_count,
+      status: row.status as any,
+      adminNotes: row.admin_notes || undefined,
+      detectedAt: row.detected_at,
+      resolvedAt: row.resolved_at || undefined,
+    }));
+  } catch (err) {
+    logWarning("[Supabase Data] Failed to fetch anomalies notice:", err);
+    return [];
+  }
+}
+
+/**
+ * Updates an anomaly's lifecycle status or admin note in Supabase.
+ */
+export async function updateAnomalyStatusInSupabase(
+  id: string,
+  status: AnomalyStatus,
+  adminNotes?: string,
+): Promise<void> {
+  try {
+    const updateData: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (status === "Resolved") {
+      updateData.resolved_at = new Date().toISOString();
+    }
+    if (adminNotes !== undefined) {
+      updateData.admin_notes = adminNotes;
+    }
+    await supabase.from("maintenance_anomalies").update(updateData).eq("id", id);
+  } catch (err) {
+    logWarning("[Supabase Data] Update anomaly notice:", err);
   }
 }

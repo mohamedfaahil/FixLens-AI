@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   initialComplaints,
@@ -22,9 +22,25 @@ import {
   voteProposalInSupabase,
   reviewProposalInSupabase,
   fetchUserVotesFromSupabase,
+  fetchAnomaliesFromSupabase,
+  updateAnomalyStatusInSupabase,
+  recordEscalationInSupabase,
 } from "./supabase-data";
 import { getStudentAuthState, getAdminAuthState } from "./supabase-auth";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  generateAdminAlerts,
+  type AdminAlert,
+  type AlertStatus,
+} from "./admin-alert-engine";
+import {
+  evaluateComplaintEscalation,
+  type ComplaintEscalationResult,
+} from "./escalation-engine";
+import {
+  type MaintenanceAnomaly,
+  type AnomalyStatus,
+} from "./anomaly-engine";
 
 export interface StudentUser {
   id?: string;
@@ -62,12 +78,29 @@ export interface Store {
   ) => Complaint;
   updateComplaint: (
     id: string,
-    patch: { status?: Status; priority?: Priority; note?: string },
+    patch: {
+      status?: Status;
+      priority?: Priority;
+      note?: string;
+      escalatedPriority?: Priority;
+      escalationReasons?: string[];
+      isAdminOverride?: boolean;
+    },
   ) => void;
   addProposal: (p: Pick<Proposal, "title" | "description" | "category" | "location">) => Proposal;
   vote: (id: string) => boolean;
   reviewProposal: (id: string, status: ProposalStatus, note: string) => void;
   resetDemoData: () => void;
+  // Phase 2: Priority Escalation, Anomalies & Dynamic Admin Alerts
+  anomalies: MaintenanceAnomaly[];
+  adminAlerts: AdminAlert[];
+  escalatedComplaints: ComplaintEscalationResult[];
+  insufficientAnomalyData: boolean;
+  insufficientAnomalyReason?: string;
+  updateAlertStatus: (id: string, status: AlertStatus, notes?: string) => void;
+  updateAnomalyStatus: (id: string, status: AnomalyStatus, notes?: string) => void;
+  acknowledgeAlert: (id: string) => void;
+  resolveAlert: (id: string) => void;
   // Supabase synchronization
   isSupabaseConnected: boolean;
   isLoading: boolean;
@@ -93,6 +126,98 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
   const [reportDraft, setReportDraft] = useState<ReportDraft | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Phase 2: Lifecycle overrides for anomalies and alerts
+  const [persistedAnomalies, setPersistedAnomalies] = useState<MaintenanceAnomaly[]>([]);
+  const [persistedAlerts, setPersistedAlerts] = useState<AdminAlert[]>([]);
+
+  // Synthesize dynamic alerts, anomalies and escalations from live complaints
+  const alertsSnapshot = useMemo(() => {
+    return generateAdminAlerts(complaints, persistedAlerts, persistedAnomalies);
+  }, [complaints, persistedAlerts, persistedAnomalies]);
+
+  const updateAlertStatus = (id: string, status: AlertStatus, notes?: string) => {
+    const nowStr = new Date().toISOString();
+    setPersistedAlerts((prev) => {
+      const existing = prev.find((a) => a.id === id);
+      if (existing) {
+        return prev.map((a) =>
+          a.id === id
+            ? {
+                ...a,
+                status,
+                adminNotes: notes !== undefined ? notes : a.adminNotes,
+                resolvedAt: status === "Resolved" ? nowStr : a.resolvedAt,
+              }
+            : a,
+        );
+      }
+      const match = alertsSnapshot.alerts.find((a) => a.id === id);
+      if (match) {
+        return [
+          ...prev,
+          {
+            ...match,
+            status,
+            adminNotes: notes,
+            resolvedAt: status === "Resolved" ? nowStr : undefined,
+          },
+        ];
+      }
+      return prev;
+    });
+
+    if (id.startsWith("alert-anom-")) {
+      const anomId = id.replace("alert-anom-", "");
+      updateAnomalyStatus(anomId, status as AnomalyStatus, notes);
+    }
+  };
+
+  const updateAnomalyStatus = (id: string, status: AnomalyStatus, notes?: string) => {
+    const nowStr = new Date().toISOString();
+    setPersistedAnomalies((prev) => {
+      const existing = prev.find((a) => a.id === id);
+      if (existing) {
+        return prev.map((a) =>
+          a.id === id
+            ? {
+                ...a,
+                status,
+                adminNotes: notes !== undefined ? notes : a.adminNotes,
+                resolvedAt: status === "Resolved" ? nowStr : a.resolvedAt,
+              }
+            : a,
+        );
+      }
+      const match = alertsSnapshot.anomalies.find((a) => a.id === id);
+      if (match) {
+        return [
+          ...prev,
+          {
+            ...match,
+            status,
+            adminNotes: notes,
+            resolvedAt: status === "Resolved" ? nowStr : undefined,
+          },
+        ];
+      }
+      return prev;
+    });
+
+    if (isSupabaseConnected) {
+      updateAnomalyStatusInSupabase(id, status, notes).catch((err) => {
+        logStoreNotice("[Demo Store] Update anomaly Supabase notice:", err);
+      });
+    }
+  };
+
+  const acknowledgeAlert = (id: string) => {
+    updateAlertStatus(id, "Acknowledged");
+  };
+
+  const resolveAlert = (id: string) => {
+    updateAlertStatus(id, "Resolved");
+  };
 
   // Synchronize with Supabase database
   const refreshData = async () => {
@@ -175,6 +300,16 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     isSupabaseConnected,
     isLoading,
     refreshData,
+    // Phase 2: Priority Escalation, Anomalies & Dynamic Admin Alerts
+    anomalies: alertsSnapshot.anomalies,
+    adminAlerts: alertsSnapshot.alerts,
+    escalatedComplaints: alertsSnapshot.escalations,
+    insufficientAnomalyData: alertsSnapshot.insufficientData,
+    insufficientAnomalyReason: alertsSnapshot.insufficientDataReason,
+    updateAlertStatus,
+    updateAnomalyStatus,
+    acknowledgeAlert,
+    resolveAlert,
 
     addFollowUp: (complaintId, content) => {
       const trimmed = content.trim();
@@ -272,7 +407,13 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         xs.map((c) => {
           if (c.id !== id) return c;
           const next = { ...c };
-          if (patch.priority) next.priority = patch.priority;
+          if (patch.priority) {
+            next.priority = patch.priority;
+            next.isAdminOverride = true;
+          }
+          if (patch.escalatedPriority) next.escalatedPriority = patch.escalatedPriority;
+          if (patch.escalationReasons) next.escalationReasons = patch.escalationReasons;
+          if (patch.isAdminOverride !== undefined) next.isAdminOverride = patch.isAdminOverride;
           const trimmedNote = patch.note?.trim();
           if (trimmedNote) {
             next.resolutionNote = trimmedNote;
@@ -389,6 +530,8 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       setComplaints(initialComplaints);
       setProposals(initialProposals);
       setVoted([]);
+      setPersistedAnomalies([]);
+      setPersistedAlerts([]);
       setCurrentStudent(DEMO_STUDENT);
       setReportDraft(null);
     },
@@ -416,6 +559,15 @@ export function useDemoStore() {
       vote: () => false,
       reviewProposal: () => {},
       resetDemoData: () => {},
+      anomalies: [],
+      adminAlerts: [],
+      escalatedComplaints: [],
+      insufficientAnomalyData: false,
+      insufficientAnomalyReason: undefined,
+      updateAlertStatus: () => {},
+      updateAnomalyStatus: () => {},
+      acknowledgeAlert: () => {},
+      resolveAlert: () => {},
       isSupabaseConnected: false,
       isLoading: false,
       refreshData: async () => {},

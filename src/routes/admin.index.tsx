@@ -1,15 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, ClipboardList, Flame, Hourglass } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { CheckCircle2, ClipboardList, Flame, Hourglass } from "lucide-react";
 import {
   DemoNotice,
   PageHeader,
-  Panel,
-  PriorityBadge,
   StatCard,
 } from "@/components/fixlens/ui-bits";
 import { AnalyticsView } from "@/components/fixlens/AnalyticsView";
+import { AdminAlertsPanel } from "@/components/fixlens/AdminAlertsPanel";
 import { useDemoStore } from "@/lib/demo-store";
-import { anomalyAlerts, DEMO_ADMIN } from "@/lib/demo-data";
+import { DEMO_ADMIN } from "@/lib/demo-data";
 import { ADMIN_ACCOUNT } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
@@ -60,31 +59,7 @@ function AdminOverview() {
           hint={isSupabaseConnected ? "Live database" : "Demo data"}
         />
       </div>
-      <Panel
-        className="mt-5"
-        title="Anomaly alerts"
-        action={
-          <Link
-            to="/admin/complaints"
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            Review complaints
-          </Link>
-        }
-      >
-        <ul className="divide-y">
-          {anomalyAlerts.map((a) => (
-            <li key={a.title} className="flex items-start gap-3 py-3">
-              <AlertTriangle className="mt-0.5 size-4 text-primary" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-foreground">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{a.detail}</p>
-              </div>
-              <PriorityBadge priority={a.level} />
-            </li>
-          ))}
-        </ul>
-      </Panel>
+      <AdminAlertsPanel />
       <div className="mt-5">
         <AnalyticsView compact />
       </div>

@@ -125,6 +125,41 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+-- PHASE 2: COMPLAINT ESCALATIONS AUDIT TRAIL
+CREATE TABLE IF NOT EXISTS public.complaint_escalations (
+  id TEXT PRIMARY KEY DEFAULT ('ESC-' || extract(epoch from now())::bigint || '-' || floor(random() * 1000)::int),
+  complaint_id TEXT NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
+  previous_priority TEXT NOT NULL CHECK (previous_priority IN ('Low', 'Medium', 'High')),
+  escalated_priority TEXT NOT NULL CHECK (escalated_priority IN ('Low', 'Medium', 'High')),
+  reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
+  trigger_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+  factors JSONB NOT NULL DEFAULT '{}'::jsonb,
+  admin_reviewed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- PHASE 2: MAINTENANCE ANOMALIES TABLE
+CREATE TABLE IF NOT EXISTS public.maintenance_anomalies (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  anomaly_type TEXT NOT NULL CHECK (anomaly_type IN ('BUILDING_SPIKE', 'ROOM_HOTSPOT', 'CATEGORY_SURGE', 'UNRESOLVED_BACKLOG', 'MULTI_STUDENT_HAZARD')),
+  severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High')),
+  building TEXT NOT NULL,
+  room TEXT,
+  category TEXT,
+  description TEXT NOT NULL,
+  evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+  contributing_complaint_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  distinct_reporters INTEGER NOT NULL DEFAULT 1,
+  incident_count INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'New' CHECK (status IN ('New', 'Investigating', 'Acknowledged', 'Resolved')),
+  admin_notes TEXT,
+  detected_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
 -- ====================================================================
 -- 3. INDEXES FOR PERFORMANCE & INTEGRITY
 -- ====================================================================

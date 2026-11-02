@@ -95,6 +95,12 @@ export interface Complaint {
   predictionSource?: string | undefined;
   isTrainedModel?: boolean | undefined;
   signals?: string[] | undefined;
+
+  // Phase 2: Priority Escalation & Anomaly Linkage
+  escalatedPriority?: Priority | undefined;
+  escalationReasons?: string[] | undefined;
+  escalatedAt?: string | undefined;
+  isAdminOverride?: boolean | undefined;
 }
 
 export interface Proposal {
