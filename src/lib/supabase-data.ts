@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateUniqueComplaintId, isDuplicateKeyError } from "./id-generator";
 export { generateUniqueComplaintId, isDuplicateKeyError };
+import { getAdminAuthState, getStudentAuthState } from "./supabase-auth";
 import type {
   Category,
   Complaint,
@@ -513,6 +514,12 @@ export async function createComplaintInSupabase(
   user: { id?: string; name: string },
   imageFile?: File,
 ): Promise<Complaint> {
+  // Reject administrator accounts from submitting student complaints
+  const adminAuth = await getAdminAuthState();
+  if (adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Administrators cannot submit student complaints.");
+  }
+
   let storedImagePath: string | undefined = undefined;
 
   // 1. Upload image to Supabase Storage if a File was provided
@@ -632,6 +639,18 @@ export async function updateComplaintInSupabase(
   },
   adminName: string = "FixLens Administrator",
 ): Promise<void> {
+  // Reject students from performing administrative complaint updates
+  const [adminAuth, studentAuth] = await Promise.all([
+    getAdminAuthState(),
+    getStudentAuthState(),
+  ]);
+  if (studentAuth.isAuthenticated && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Students are not permitted to update operational complaint details.");
+  }
+  if (!isTestMode && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Administrator privileges required.");
+  }
+
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
@@ -887,6 +906,17 @@ export async function reviewProposalInSupabase(
   status: ProposalStatus,
   note: string,
 ): Promise<void> {
+  const [adminAuth, studentAuth] = await Promise.all([
+    getAdminAuthState(),
+    getStudentAuthState(),
+  ]);
+  if (studentAuth.isAuthenticated && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Students cannot review improvement proposals.");
+  }
+  if (!isTestMode && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Administrator privileges required.");
+  }
+
   const { error } = await supabase
     .from("proposals")
     .update({
@@ -1035,6 +1065,17 @@ export async function updateAnomalyStatusInSupabase(
   status: AnomalyStatus,
   adminNotes?: string,
 ): Promise<void> {
+  const [adminAuth, studentAuth] = await Promise.all([
+    getAdminAuthState(),
+    getStudentAuthState(),
+  ]);
+  if (studentAuth.isAuthenticated && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Students cannot update maintenance anomaly statuses.");
+  }
+  if (!isTestMode && !adminAuth.isAuthenticated) {
+    throw new Error("Access denied: Administrator privileges required.");
+  }
+
   try {
     const updateData: Record<string, unknown> = {
       status,

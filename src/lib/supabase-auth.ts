@@ -208,6 +208,10 @@ export async function signOutAdmin(): Promise<void> {
 /**
  * Checks if a student is currently authenticated with a live Supabase session.
  * Fetches user profile metadata (UUID, full name, department, phone).
+ *
+ * Security Requirement:
+ * - Strictly rejects administrator accounts (by email, JWT app_metadata role, or profiles.role).
+ * - Administrator sessions must NEVER be reused or acknowledged as Student sessions.
  */
 export async function getStudentAuthState(): Promise<StudentAuthState> {
   if (typeof window === "undefined") {
@@ -223,8 +227,26 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
     const user = data.session.user;
     if (!user.email) return { isAuthenticated: false };
 
-    // Fetch profile details from public.profiles with abort timeout
-    let profileData: { full_name?: string | null; department?: string | null; phone?: string | null; role?: string } | null = null;
+    const sessionEmail = user.email.toLowerCase().trim();
+
+    // 1. REJECT DESIGNATED ADMINISTRATOR IDENTITY
+    if (sessionEmail === ADMIN_ACCOUNT.email.toLowerCase()) {
+      return { isAuthenticated: false };
+    }
+
+    // 2. REJECT ADMIN ROLE IN JWT APP_METADATA (server-assigned claim)
+    if (user.app_metadata?.role === "admin") {
+      return { isAuthenticated: false };
+    }
+
+    // 3. FETCH AND VERIFY DATABASE PROFILE
+    let profileData: {
+      full_name?: string | null;
+      department?: string | null;
+      phone?: string | null;
+      role?: string | null;
+    } | null = null;
+
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 2000);
@@ -242,10 +264,15 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
       // offline / demo fallback
     }
 
+    // 4. REJECT IF PROFILE ROLE IS ADMIN
+    if (profileData?.role === "admin") {
+      return { isAuthenticated: false };
+    }
+
     const derivedName =
       profileData?.full_name ||
       user.user_metadata?.full_name ||
-      user.email
+      sessionEmail
         .split("@")[0]
         .replace(/[._-]/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -258,7 +285,7 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
         name: derivedName,
         department: profileData?.department || user.user_metadata?.department || "General",
         phone: profileData?.phone || user.user_metadata?.phone,
-        role: profileData?.role || (user.app_metadata?.role as string) || "student",
+        role: "student",
       },
     };
   } catch {
@@ -268,6 +295,7 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
 
 /**
  * Signs in a student with campus email and password via Supabase Auth.
+ * Enforces strict separation: Administrator accounts cannot sign in as students.
  */
 export async function signInStudent(
   emailInput: string,
@@ -286,6 +314,15 @@ export async function signInStudent(
   }
   if (!password) {
     return { success: false, error: "Please enter your password." };
+  }
+
+  // Pre-check: Block administrator accounts from authenticating via student login
+  if (email === ADMIN_ACCOUNT.email.toLowerCase()) {
+    return {
+      success: false,
+      error:
+        "Access denied: This is the Student portal. Administrator accounts must sign in via the Administrator Login.",
+    };
   }
 
   try {
@@ -313,7 +350,25 @@ export async function signInStudent(
     }
 
     const user = data.user;
-    let profileData: { full_name?: string | null; department?: string | null; phone?: string | null; role?: string } | null = null;
+
+    // Post-check: Verify user is NOT an administrator via app_metadata
+    if (user.app_metadata?.role === "admin") {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error:
+          "Access denied: This account has administrator privileges. Please sign in via the Administrator Login.",
+      };
+    }
+
+    // Post-check: Verify profile role in database
+    let profileData: {
+      full_name?: string | null;
+      department?: string | null;
+      phone?: string | null;
+      role?: string | null;
+    } | null = null;
+
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 2000);
@@ -329,6 +384,15 @@ export async function signInStudent(
       profileData = profile;
     } catch {
       // offline fallback
+    }
+
+    if (profileData?.role === "admin") {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error:
+          "Access denied: This account has administrator privileges. Please sign in via the Administrator Login.",
+      };
     }
 
     const derivedName =
@@ -348,7 +412,7 @@ export async function signInStudent(
         name: derivedName,
         department: profileData?.department || user.user_metadata?.department || "General",
         phone: profileData?.phone || user.user_metadata?.phone,
-        role: profileData?.role || "student",
+        role: "student",
       },
     };
   } catch (err: unknown) {
@@ -418,6 +482,13 @@ export async function signUpStudent(input: {
 
   if (!email) {
     return { success: false, sessionEstablished: false, error: "Please enter your campus email." };
+  }
+  if (email === ADMIN_ACCOUNT.email.toLowerCase()) {
+    return {
+      success: false,
+      sessionEstablished: false,
+      error: "This email address is reserved for system administration. Student registration is not permitted.",
+    };
   }
   if (!password) {
     return { success: false, sessionEstablished: false, error: "Please enter a password." };

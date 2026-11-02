@@ -1,12 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ShieldAlert, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AsideCopy } from "@/components/fixlens/AuthAside";
 import { DEMO_STUDENT } from "@/lib/demo-data";
 import { useDemoStore } from "@/lib/demo-store";
-import { signInStudent, resendStudentConfirmationEmail, getStudentAuthState } from "@/lib/supabase-auth";
+import {
+  signInStudent,
+  resendStudentConfirmationEmail,
+  getStudentAuthState,
+  getAdminAuthState,
+  signOutAdmin,
+  signOutStudent,
+} from "@/lib/supabase-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageHead } from "@/lib/seo";
 
@@ -19,7 +27,7 @@ export const Route = createFileRoute("/login")({
   component: Login,
 });
 
-function Login() {
+export function Login() {
   const nav = useNavigate();
   const { setCurrentStudent } = useDemoStore();
   const [f, setF] = useState({ email: "", password: "" });
@@ -52,26 +60,48 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [activeAdminEmail, setActiveAdminEmail] = useState<string | null>(null);
+  const [activeStudentEmail, setActiveStudentEmail] = useState<string | null>(null);
 
-  // Check if student arrived from clicking an email confirmation verification link
+  // Check auth session on mount without silently hijacking student login
   useEffect(() => {
     let active = true;
-    const checkVerification = async () => {
+    const checkAuthStatus = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (active && data.session?.user) {
-          const studentAuth = await getStudentAuthState();
-          if (active && studentAuth.isAuthenticated && studentAuth.user) {
-            setCurrentStudent(studentAuth.user);
-            toast.success(`Email verified! Welcome, ${studentAuth.user.name}.`);
-            nav({ to: "/student" });
-          }
+        const [adminAuth, studentAuth] = await Promise.all([
+          getAdminAuthState(),
+          getStudentAuthState(),
+        ]);
+
+        if (!active) return;
+
+        if (adminAuth.isAuthenticated && adminAuth.email) {
+          setActiveAdminEmail(adminAuth.email);
+        } else if (studentAuth.isAuthenticated && studentAuth.user) {
+          setActiveStudentEmail(studentAuth.user.email);
+        }
+
+        // Email confirmation callback handling: ONLY redirect if URL has auth confirmation tokens
+        const hash = typeof window !== "undefined" ? window.location.hash : "";
+        const search = typeof window !== "undefined" ? window.location.search : "";
+        const isConfirmCallback =
+          hash.includes("access_token") ||
+          hash.includes("type=signup") ||
+          hash.includes("type=recovery") ||
+          search.includes("code=") ||
+          search.includes("type=signup");
+
+        if (isConfirmCallback && studentAuth.isAuthenticated && studentAuth.user) {
+          setCurrentStudent(studentAuth.user);
+          toast.success(`Email verified! Welcome, ${studentAuth.user.name}.`);
+          nav({ to: "/student" });
         }
       } catch {
         // Ignored
       }
     };
-    checkVerification();
+
+    checkAuthStatus();
     return () => {
       active = false;
     };
@@ -184,6 +214,85 @@ function Login() {
       subtitle="Report issues and follow their progress."
       aside={<AsideCopy />}
     >
+      {activeAdminEmail && (
+        <div
+          role="status"
+          data-testid="admin-session-active-banner"
+          className="mb-4 rounded-xl border border-amber-300/80 bg-amber-50/90 p-4 text-xs text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 space-y-2"
+        >
+          <div className="font-semibold flex items-center gap-2 text-sm text-amber-900 dark:text-amber-100">
+            <ShieldAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            Administrator Session Active ({activeAdminEmail})
+          </div>
+          <p className="leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+            You are currently signed in with an administrator account. The Student Portal requires student credentials. Sign in with your student account below, or return to the Administrator Portal.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                await signOutAdmin();
+                setActiveAdminEmail(null);
+                toast.info("Administrator signed out.");
+              }}
+              className="text-xs h-7 bg-white dark:bg-zinc-900"
+            >
+              Sign out Administrator
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => nav({ to: "/admin" })}
+              className="text-xs h-7 text-primary hover:underline"
+            >
+              Go to Admin Portal &rarr;
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {activeStudentEmail && (
+        <div
+          role="status"
+          data-testid="student-session-active-banner"
+          className="mb-4 rounded-xl border border-blue-300/80 bg-blue-50/90 p-4 text-xs text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200 space-y-2"
+        >
+          <div className="font-semibold flex items-center gap-2 text-sm text-blue-900 dark:text-blue-100">
+            <UserRound className="size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+            Signed in as Student ({activeStudentEmail})
+          </div>
+          <p className="leading-relaxed text-blue-900/80 dark:text-blue-200/80">
+            You already have an active student session. You can proceed directly to your Student Dashboard or sign in with a different student account.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => nav({ to: "/student" })}
+              className="text-xs h-7 bg-white dark:bg-zinc-900 text-primary font-medium"
+            >
+              Go to Student Dashboard &rarr;
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={async () => {
+                await signOutStudent();
+                setActiveStudentEmail(null);
+                toast.info("Student signed out.");
+              }}
+              className="text-xs h-7 text-muted-foreground hover:text-foreground"
+            >
+              Sign out
+            </Button>
+          </div>
+        </div>
+      )}
       {unconfirmedEmail && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
           <div className="font-semibold text-amber-950 dark:text-amber-100 mb-1">

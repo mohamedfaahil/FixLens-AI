@@ -233,11 +233,11 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
 
       if (studentAuth.isAuthenticated && studentAuth.user) {
         setCurrentStudent(studentAuth.user);
+      } else {
+        setCurrentStudent(DEMO_STUDENT);
       }
 
-      const activeUserId =
-        studentAuth.user?.id ||
-        (adminAuth.isAuthenticated ? undefined : (currentStudent.id !== DEMO_STUDENT.id ? currentStudent.id : undefined));
+      const activeUserId = studentAuth.isAuthenticated ? studentAuth.user?.id : undefined;
       const isAdmin = adminAuth.isAuthenticated;
 
       const [remoteComplaints, remoteProposals, remoteVotes] = await Promise.all([
@@ -278,6 +278,8 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
         const studentAuth = await getStudentAuthState();
         if (studentAuth.isAuthenticated && studentAuth.user) {
           setCurrentStudent(studentAuth.user);
+        } else {
+          setCurrentStudent(DEMO_STUDENT);
         }
       } else {
         setCurrentStudent(DEMO_STUDENT);

@@ -33,7 +33,7 @@ const nav: NavItem[] = [
   { to: "/admin/profile", label: "Profile", icon: UserRound },
 ];
 
-function AdminLayout() {
+export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(true);
@@ -84,9 +84,14 @@ function AdminLayout() {
             The administrator portal requires verified authentication. Access is restricted to{" "}
             <strong>{ADMIN_ACCOUNT.email}</strong>.
           </p>
-          <Button onClick={() => navigate({ to: "/admin-login" })}>
-            Sign in as Administrator
-          </Button>
+          <div className="flex justify-center gap-2">
+            <Button onClick={() => navigate({ to: "/admin-login" })}>
+              Sign in as Administrator
+            </Button>
+            <Button variant="outline" onClick={() => navigate({ to: "/login" })}>
+              Go to Student Login
+            </Button>
+          </div>
         </div>
       </div>
     );

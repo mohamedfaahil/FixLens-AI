@@ -28,6 +28,7 @@ import {
 import { MethodExplainer, PredictionCard } from "@/components/fixlens/PriorityPanel";
 import { useDemoStore } from "@/lib/demo-store";
 import { findPotentialDuplicates } from "@/lib/triage-engine";
+import { getAdminAuthState } from "@/lib/supabase-auth";
 import {
   BUILDINGS,
   CATEGORIES,
@@ -321,6 +322,14 @@ function Report() {
     setIsSubmitting(true);
     setSubmissionError(null);
     try {
+      // Reject administrator accounts from submitting student complaints
+      const adminAuth = await getAdminAuthState();
+      if (adminAuth.isAuthenticated) {
+        throw new Error(
+          "Access denied: Administrator accounts cannot submit student complaints. Please sign in with a student account.",
+        );
+      }
+
       // Obtain latest prediction from API (or fallback)
       let finalPred = prediction;
       if (!finalPred.isTrainedModel || isLoadingPrediction) {

@@ -1,9 +1,18 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ClipboardList, FilePlus2, LayoutDashboard, Lightbulb, UserRound, Loader2 } from "lucide-react";
+import {
+  ClipboardList,
+  FilePlus2,
+  LayoutDashboard,
+  Lightbulb,
+  UserRound,
+  Loader2,
+  ShieldAlert,
+} from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/fixlens/PortalShell";
 import { useDemoStore } from "@/lib/demo-store";
-import { getStudentAuthState } from "@/lib/supabase-auth";
+import { getStudentAuthState, getAdminAuthState, ADMIN_ACCOUNT } from "@/lib/supabase-auth";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/student")({
@@ -18,10 +27,11 @@ const nav: NavItem[] = [
   { to: "/student/profile", label: "Profile", icon: UserRound },
 ];
 
-function StudentLayout() {
+export function StudentLayout() {
   const { currentStudent } = useDemoStore();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,15 +42,36 @@ function StudentLayout() {
       typeof sessionStorage !== "undefined" &&
       sessionStorage.getItem("fixlens_demo_session") === "true";
 
-    getStudentAuthState().then((authState) => {
+    const verifyAccess = async () => {
+      // 1. Strictly check if caller is an administrator account
+      const adminAuth = await getAdminAuthState();
+      if (adminAuth.isAuthenticated) {
+        if (!isMounted) return;
+        setAuthorized(false);
+        setChecking(false);
+        toast.error(
+          "Access restricted: Administrator accounts cannot access the Student Portal. Please sign in with student credentials.",
+        );
+        navigate({ to: "/login" });
+        return;
+      }
+
+      // 2. Verify Student authorization
+      const authState = await getStudentAuthState();
       if (!isMounted) return;
+
       if (!authState.isAuthenticated && !isTestMode && !isExplicitDemo) {
+        setAuthorized(false);
+        setChecking(false);
         toast.info("Please sign in to access the student portal.");
         navigate({ to: "/login" });
       } else {
+        setAuthorized(true);
         setChecking(false);
       }
-    });
+    };
+
+    verifyAccess();
 
     return () => {
       isMounted = false;
@@ -60,11 +91,36 @@ function StudentLayout() {
     );
   }
 
+  if (!authorized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center space-y-4">
+          <ShieldAlert className="mx-auto size-10 text-destructive" />
+          <h2 className="text-lg font-bold text-foreground">Access Restricted</h2>
+          <p className="text-sm text-muted-foreground">
+            The Student Portal is restricted to verified student accounts. Administrator accounts are not permitted to access student functions.
+          </p>
+          <div className="flex justify-center gap-2">
+            <Button onClick={() => navigate({ to: "/login" })}>
+              Sign in as Student
+            </Button>
+            <Button variant="outline" onClick={() => navigate({ to: "/admin" })}>
+              Go to Admin Portal
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       nav={nav}
       portal="Student"
-      user={{ name: currentStudent?.name || "Student", sub: currentStudent?.department || "Campus" }}
+      user={{
+        name: currentStudent?.name || "Student",
+        sub: currentStudent?.department || "Campus",
+      }}
     >
       <Outlet />
     </PortalShell>
