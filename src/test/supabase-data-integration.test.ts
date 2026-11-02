@@ -506,4 +506,112 @@ describe("FixLens AI — Supabase Data & Storage Integration", () => {
       expect(updateMock).toHaveBeenCalled();
     });
   });
+
+  describe("Collision Resistance and Duplicate-Key Retry", () => {
+    it("retries with a fresh unique ID when encountering complaints_pkey duplicate key error", async () => {
+      let complaintInsertAttempt = 0;
+      let insertedIds: string[] = [];
+      let timelineComplaintId: string | null = null;
+
+      vi.spyOn(supabase, "from").mockImplementation((table: string) => {
+        if (table === "complaints") {
+          return {
+            insert: vi.fn().mockImplementation((row: any) => {
+              complaintInsertAttempt++;
+              insertedIds.push(row.id);
+              if (complaintInsertAttempt === 1) {
+                // First attempt collides with existing primary key
+                return Promise.resolve({
+                  error: {
+                    code: "23505",
+                    message: 'duplicate key value violates unique constraint "complaints_pkey"',
+                    details: `Key (id)=(${row.id}) already exists.`,
+                  },
+                });
+              }
+              // Second attempt succeeds
+              return Promise.resolve({ error: null });
+            }),
+          } as any;
+        }
+
+        if (table === "complaint_timeline") {
+          return {
+            insert: vi.fn().mockImplementation((row: any) => {
+              timelineComplaintId = row.complaint_id;
+              return Promise.resolve({ error: null });
+            }),
+          } as any;
+        }
+
+        return {} as any;
+      });
+
+      const result = await createComplaintInSupabase(
+        {
+          id: "FX-COLLISION-TEST",
+          title: "Overheating server rack",
+          description: "Server rack in basement is overheating and alarming.",
+          category: "Electrical",
+          building: "Tech Block",
+          room: "Server Room",
+          urgency: "High",
+          affected: 100,
+          priority: "High",
+        },
+        {
+          id: "student-uuid-555",
+          name: "Priya Sharma",
+        },
+      );
+
+      // Verify retry occurred
+      expect(complaintInsertAttempt).toBe(2);
+      expect(insertedIds.length).toBe(2);
+      // Initial ID was the colliding ID
+      expect(insertedIds[0]).toBe("FX-COLLISION-TEST");
+      // Second ID was freshly generated
+      expect(insertedIds[1]).toMatch(/^FX-\d+$/);
+      expect(insertedIds[1]).not.toBe("FX-COLLISION-TEST");
+
+      // Verify final complaint object has the retried ID
+      expect(result.id).toBe(insertedIds[1]);
+
+      // Verify timeline entry was inserted with the matching retried ID
+      expect(timelineComplaintId).toBe(insertedIds[1]);
+    });
+
+    it("throws immediately on non-duplicate key errors without retrying", async () => {
+      let attempts = 0;
+      vi.spyOn(supabase, "from").mockReturnValue({
+        insert: vi.fn().mockImplementation(() => {
+          attempts++;
+          return Promise.resolve({
+            error: {
+              code: "42501",
+              message: "permission denied for table complaints",
+            },
+          });
+        }),
+      } as any);
+
+      await expect(
+        createComplaintInSupabase(
+          {
+            title: "Testing permission error",
+            description: "Permission error should not trigger duplicate retry.",
+            category: "Other",
+            building: "Main Building",
+            room: "101",
+            urgency: "Low",
+            affected: 1,
+            priority: "Low",
+          },
+          { id: "student-uuid-1", name: "Student" },
+        ),
+      ).rejects.toThrow("permission denied for table complaints");
+
+      expect(attempts).toBe(1);
+    });
+  });
 });

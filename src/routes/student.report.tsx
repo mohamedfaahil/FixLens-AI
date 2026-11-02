@@ -94,6 +94,7 @@ function Report() {
     >
   >({});
   const [done, setDone] = useState<Complaint | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
   const [prediction, setPrediction] = useState<MLPredictionResult>(() => {
@@ -318,6 +319,7 @@ function Report() {
     }
 
     setIsSubmitting(true);
+    setSubmissionError(null);
     try {
       // Obtain latest prediction from API (or fallback)
       let finalPred = prediction;
@@ -331,30 +333,45 @@ function Report() {
         setPrediction(finalPred);
       }
 
-      const c = addComplaint({
-        title: f.title.trim(),
-        description: f.description.trim(),
-        category: f.category as Category,
-        building: f.building,
-        room: f.room.trim(),
-        urgency: f.urgency, // Student reported urgency preserved separately
-        affected: n,
-        priority: finalPred.priority, // Suggested by trained ML model
-        image: img,
-        linkedComplaintId: resolvedSameStudentRepeat
-          ? resolvedSameStudentRepeat.complaint.id
-          : undefined,
-        // Persist ML prediction metadata in the complaint record
-        predictedPriority: finalPred.priority,
-        confidence: finalPred.confidence,
-        classProbabilities: finalPred.classProbabilities,
-        predictionSource: finalPred.source,
-        isTrainedModel: finalPred.isTrainedModel,
-        signals: finalPred.signals,
-      }, selectedFile);
+      // Await persistence confirmation before advancing to success screen
+      const c = await addComplaint(
+        {
+          title: f.title.trim(),
+          description: f.description.trim(),
+          category: f.category as Category,
+          building: f.building,
+          room: f.room.trim(),
+          urgency: f.urgency, // Student reported urgency preserved separately
+          affected: n,
+          priority: finalPred.priority, // Suggested by trained ML model
+          image: img,
+          linkedComplaintId: resolvedSameStudentRepeat
+            ? resolvedSameStudentRepeat.complaint.id
+            : undefined,
+          // Persist ML prediction metadata in the complaint record
+          predictedPriority: finalPred.priority,
+          confidence: finalPred.confidence,
+          classProbabilities: finalPred.classProbabilities,
+          predictionSource: finalPred.source,
+          isTrainedModel: finalPred.isTrainedModel,
+          signals: finalPred.signals,
+        },
+        selectedFile,
+      );
+
+      // Only clear draft and display success once database insert has succeeded
       setReportDraft(null);
       setIsSeparateIncidentConfirmed(false);
       setDone(c);
+      toast.success("Complaint submitted successfully.");
+    } catch (submissionErr: unknown) {
+      // Database or persistence failure: do not clear form or draft; keep student data intact for retry
+      const errorMsg =
+        submissionErr instanceof Error
+          ? submissionErr.message
+          : "Failed to submit complaint to the server. Please try again.";
+      setSubmissionError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -404,6 +421,7 @@ function Report() {
               variant="outline"
               onClick={() => {
                 setDone(null);
+                setSubmissionError(null);
                 setF(empty);
                 setImg(undefined);
                 setReportDraft(null);
@@ -756,6 +774,26 @@ function Report() {
               </div>
             )}
 
+            {/* Failure state notice preserving user form data */}
+            {submissionError && (
+              <div
+                role="alert"
+                data-testid="submission-error-alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold text-destructive">Submission Failed</h4>
+                    <p className="mt-1 text-xs text-destructive/90">{submissionError}</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Your entered complaint details have been preserved. Please verify your connection and try submitting again.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button
                 type="button"
@@ -765,6 +803,7 @@ function Report() {
                   setF(empty);
                   setImg(undefined);
                   setErr({});
+                  setSubmissionError(null);
                   setReportDraft(null);
                 }}
               >

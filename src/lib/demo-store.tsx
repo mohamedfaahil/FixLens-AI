@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { generateUniqueComplaintId } from "./id-generator";
 import {
   initialComplaints,
   initialProposals,
@@ -75,7 +76,7 @@ export interface Store {
   addComplaint: (
     c: Omit<Complaint, "id" | "status" | "date" | "reporter" | "timeline">,
     imageFile?: File,
-  ) => Complaint;
+  ) => Complaint & PromiseLike<Complaint>;
   updateComplaint: (
     id: string,
     patch: {
@@ -356,18 +357,14 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
     },
 
     addComplaint: (c, imageFile) => {
-      const numIds = complaints
-        .map((x) => Number(x.id.replace(/[^\d]/g, "")))
-        .filter((n) => !isNaN(n));
-      const n = (numIds.length > 0 ? Math.max(...numIds) : 1000) + 1;
-      const localId = `FX-${n}`;
+      const uniqueId = generateUniqueComplaintId();
       const initialNote = c.linkedComplaintId
         ? `Complaint received (demo). Reopened recurrence linked to ${c.linkedComplaintId}.`
         : "Complaint received (demo).";
 
       const item: Complaint = {
         ...c,
-        id: localId,
+        id: uniqueId,
         status: "Submitted",
         date: today(),
         reporter: currentStudent.name,
@@ -385,21 +382,40 @@ export function DemoStoreProvider({ children }: { children: ReactNode }) {
       // Optimistic state update
       setComplaints((xs) => [item, ...xs]);
 
-      // Asynchronously persist to Supabase if authenticated
-      if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
-        createComplaintInSupabase({ ...c, id: localId }, currentStudent, imageFile)
-          .then((persisted) => {
-            setComplaints((xs) => xs.map((comp) => (comp.id === localId ? persisted : comp)));
-          })
-          .catch((err) => {
-            logStoreNotice("[Demo Store] Complaint Supabase persist notice:", err);
+      // Supabase persistence promise
+      const persistPromise: Promise<Complaint> = (async () => {
+        if (currentStudent.id && currentStudent.id !== DEMO_STUDENT.id) {
+          try {
+            const persisted = await createComplaintInSupabase(
+              { ...c, id: uniqueId },
+              currentStudent,
+              imageFile,
+            );
+            setComplaints((xs) => xs.map((comp) => (comp.id === uniqueId ? persisted : comp)));
+            return persisted;
+          } catch (err) {
+            // Revert optimistic complaint upon failure
+            setComplaints((xs) => xs.filter((comp) => comp.id !== uniqueId));
+            logStoreNotice("[Demo Store] Complaint Supabase persist error:", err);
             if (!isTestMode) {
-              toast.error("Could not save to Supabase: " + (err instanceof Error ? err.message : String(err)));
+              toast.error(
+                "Could not save to Supabase: " + (err instanceof Error ? err.message : String(err)),
+              );
             }
-          });
-      }
+            throw err;
+          }
+        }
+        return item;
+      })();
 
-      return item;
+      // Return item as Thenable so it can be either used synchronously or awaited
+      const thenable = Object.assign(item, {
+        then: persistPromise.then.bind(persistPromise),
+        catch: persistPromise.catch.bind(persistPromise),
+        finally: persistPromise.finally.bind(persistPromise),
+      });
+
+      return thenable;
     },
 
     updateComplaint: (id, patch) => {

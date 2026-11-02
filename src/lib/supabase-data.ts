@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { generateUniqueComplaintId, isDuplicateKeyError } from "./id-generator";
+export { generateUniqueComplaintId, isDuplicateKeyError };
 import type {
   Category,
   Complaint,
@@ -523,7 +525,7 @@ export async function createComplaintInSupabase(
   }
 
   // 2. Determine complaint ID (use existing ID if specified, or generate new reference ID)
-  const complaintId = draft.id || `FX-${Math.floor(1000 + Math.random() * 9000)}`;
+  let complaintId = draft.id || generateUniqueComplaintId();
   const nowIso = new Date().toISOString();
   const todayStr = nowIso.slice(0, 10);
 
@@ -531,26 +533,47 @@ export async function createComplaintInSupabase(
     ? `Complaint received. Reopened recurrence linked to ${draft.linkedComplaintId}.`
     : "Complaint received.";
 
-  // 3. Insert into public.complaints
-  const { error: insertErr } = await supabase.from("complaints").insert({
-    id: complaintId,
-    title: draft.title,
-    description: draft.description,
-    category: draft.category,
-    building: draft.building,
-    room: draft.room || null,
-    urgency: draft.urgency,
-    affected: typeof draft.affected === "number" ? draft.affected : (Number(draft.affected) || 1),
-    priority: draft.priority,
-    predicted_priority: draft.predictedPriority || null,
-    confidence: draft.confidence || null,
-    prediction_source: draft.predictionSource || null,
-    status: "Submitted",
-    reporter: user.name,
-    reporter_id: user.id || null,
-    image_url: storedImagePath || draft.image || null,
-    linked_complaint_id: draft.linkedComplaintId || null,
-  });
+  // 3. Insert into public.complaints with collision-resistant retry
+  const maxRetries = 3;
+  let insertErr: { code?: string; message?: string; details?: string } | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { error } = await supabase.from("complaints").insert({
+      id: complaintId,
+      title: draft.title,
+      description: draft.description,
+      category: draft.category,
+      building: draft.building,
+      room: draft.room || null,
+      urgency: draft.urgency,
+      affected: typeof draft.affected === "number" ? draft.affected : (Number(draft.affected) || 1),
+      priority: draft.priority,
+      predicted_priority: draft.predictedPriority || null,
+      confidence: draft.confidence || null,
+      prediction_source: draft.predictionSource || null,
+      status: "Submitted",
+      reporter: user.name,
+      reporter_id: user.id || null,
+      image_url: storedImagePath || draft.image || null,
+      linked_complaint_id: draft.linkedComplaintId || null,
+    });
+
+    if (!error) {
+      insertErr = null;
+      break;
+    }
+
+    insertErr = error;
+    if (isDuplicateKeyError(error)) {
+      logWarning(
+        `[Supabase Data] Duplicate key collision on ${complaintId}. Retrying with fresh ID (attempt ${attempt + 1}/${maxRetries})...`,
+      );
+      complaintId = generateUniqueComplaintId();
+    } else {
+      // Non-duplicate error (e.g. RLS permission, validation) - do not retry blindly
+      break;
+    }
+  }
 
   if (insertErr) {
     logError("[Supabase Data] Failed to insert complaint:", insertErr);
