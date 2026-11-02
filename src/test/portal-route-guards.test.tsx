@@ -151,8 +151,8 @@ describe("FixLens AI — Portal Route Guards & Login Separation", () => {
     });
   });
 
-  describe("Login Pages Independence & Role Notice Banners", () => {
-    it("Opening Student Login while an Admin session exists shows the form with Admin Session banner and does NOT auto-redirect", async () => {
+  describe("Login Pages Independence & Clean Presentation", () => {
+    it("Opening Student Login while an Admin session exists shows clean login form and does NOT auto-redirect to student portal", async () => {
       vi.spyOn(supabaseAuth, "getAdminAuthState").mockResolvedValue({
         isAuthenticated: true,
         email: "adminfix@gmail.com",
@@ -168,22 +168,19 @@ describe("FixLens AI — Portal Route Guards & Login Separation", () => {
         </Wrapper>,
       );
 
-      // Verify Student Login form is displayed
+      // Verify Student Login form is displayed cleanly
       expect(container.querySelector("input#email")).toBeDefined();
       expect(container.querySelector("input#password")).toBeDefined();
 
-      // Verify Admin session active banner is displayed
-      await waitFor(() => {
-        expect(screen.getByTestId("admin-session-active-banner")).toBeDefined();
-        expect(screen.getByText(/Administrator Session Active/i)).toBeDefined();
-        expect(screen.getByText(/adminfix@gmail.com/i)).toBeDefined();
-      });
+      // Verify no intrusive session banners are rendered
+      expect(screen.queryByTestId("admin-session-active-banner")).toBeNull();
+      expect(screen.queryByTestId("student-session-active-banner")).toBeNull();
 
       // Crucial: Must NOT automatically navigate to /student
       expect(mockNavigate).not.toHaveBeenCalledWith({ to: "/student" });
     });
 
-    it("Opening Admin Login while a Student session exists shows the form with Student Session banner and does NOT grant admin access", async () => {
+    it("Opening Admin Login while a Student session exists shows clean login form and does NOT grant admin access", async () => {
       vi.spyOn(supabaseAuth, "getStudentAuthState").mockResolvedValue({
         isAuthenticated: true,
         user: {
@@ -204,15 +201,12 @@ describe("FixLens AI — Portal Route Guards & Login Separation", () => {
         </Wrapper>,
       );
 
-      // Verify Administrator Login form is displayed
+      // Verify Administrator Login form is displayed cleanly
       expect(container.querySelector("input#email")).toBeDefined();
 
-      // Verify Student session active banner is displayed
-      await waitFor(() => {
-        expect(screen.getByTestId("student-session-active-banner")).toBeDefined();
-        expect(screen.getByText(/Student Session Active/i)).toBeDefined();
-        expect(screen.getByText(/student9@campus.edu/i)).toBeDefined();
-      });
+      // Verify no intrusive session banners are rendered
+      expect(screen.queryByTestId("admin-session-active-banner")).toBeNull();
+      expect(screen.queryByTestId("student-session-active-banner")).toBeNull();
 
       // Crucial: Must NOT automatically navigate to /admin
       expect(mockNavigate).not.toHaveBeenCalledWith({ to: "/admin" });
