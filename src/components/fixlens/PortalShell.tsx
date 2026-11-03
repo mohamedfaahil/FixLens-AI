@@ -19,6 +19,7 @@ import { signOutAdmin, signOutStudent } from "@/lib/supabase-auth";
 import { useDemoStore } from "@/lib/demo-store";
 import { NotificationsBell } from "./NotificationsBell";
 import { ThemeToggle } from "./ThemeToggle";
+import { ChatCopilot } from "./ChatCopilot";
 import { toast } from "sonner";
 
 export interface NavItem {
@@ -213,6 +214,7 @@ export function PortalShell({ nav, portal, user, children }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ChatCopilot portal={portal} user={user} />
     </div>
   );
 }
