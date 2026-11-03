@@ -91,12 +91,12 @@ function Queue() {
                   <th className="text-right">Affected</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border/60">
                 {open.map(({ c, esc, pred }) => (
                   <tr
                     key={c.id}
                     onClick={() => nav({ to: "/admin/complaints/$id", params: { id: c.id } })}
-                    className="cursor-pointer hover:bg-muted"
+                    className="cursor-pointer transition-colors duration-150 hover:bg-muted/50"
                   >
                     <td className="py-3 pr-3">
                       <div className="flex flex-wrap items-center gap-1.5">

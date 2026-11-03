@@ -103,17 +103,17 @@ function Overview() {
               }
             />
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-border/60">
               {mine.slice(0, 5).map((c) => (
                 <li key={c.id}>
                   <button
                     onClick={() => nav({ to: "/student/complaints/$id", params: { id: c.id } })}
-                    className="flex w-full items-center gap-3 py-3 text-left hover:text-primary"
+                    className="group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-foreground">{c.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.id} · {formatDate(c.date)} · {c.building}
+                      <p className="truncate font-semibold text-foreground text-sm group-hover:text-primary transition-colors">{c.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        <span className="font-mono text-primary font-bold">{c.id}</span> · {formatDate(c.date)} · {c.building}
                       </p>
                     </div>
                     <div className="hidden sm:block">
@@ -127,20 +127,22 @@ function Overview() {
           )}
         </Panel>
         <Panel title="Quick actions">
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {[
               { to: "/student/report", l: "Report a new issue", i: FilePlus2 },
               { to: "/student/complaints", l: "Track my complaints", i: ClipboardList },
-              { to: "/student/improvements", l: "Browse improvement proposals", i: Lightbulb },
+              { to: "/student/improvements", l: "Browse campus proposals", i: Lightbulb },
             ].map((a) => (
               <Link
                 key={a.to}
                 to={a.to}
-                className="flex items-center gap-3 rounded-lg border p-3 text-sm font-semibold text-foreground hover:border-primary hover:text-primary"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-card/60 p-3.5 text-sm font-semibold text-foreground transition-all duration-150 hover:border-primary/50 hover:bg-primary/5 hover:text-primary shadow-2xs hover:translate-x-0.5"
               >
-                <a.i className="size-4 text-primary" />
-                {a.l}
-                <ArrowRight className="ml-auto size-4" />
+                <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                  <a.i className="size-4" />
+                </div>
+                <span>{a.l}</span>
+                <ArrowRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
               </Link>
             ))}
           </div>

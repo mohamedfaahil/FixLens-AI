@@ -127,12 +127,12 @@ export function ComplaintSummary({
       <p className="text-sm leading-relaxed text-foreground">{c.description}</p>
       <dl className="grid grid-cols-2 gap-3">
         {meta.map((m) => (
-          <div key={m.l} className="rounded-lg border bg-muted/30 p-3">
-            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <m.icon className="size-3.5" />
+          <div key={m.l} className="rounded-xl border border-border bg-card/60 p-3.5 shadow-2xs">
+            <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <m.icon className="size-3.5 text-primary/80" />
               {m.l}
             </dt>
-            <dd className="mt-0.5 text-sm font-semibold text-foreground">{m.v}</dd>
+            <dd className="mt-1 text-sm font-bold text-foreground">{m.v}</dd>
           </div>
         ))}
       </dl>
@@ -140,7 +140,7 @@ export function ComplaintSummary({
         <img
           src={resolvedImage || c.image}
           alt="Attached by reporter"
-          className="max-h-56 rounded-lg border object-cover"
+          className="max-h-72 rounded-2xl border border-border object-cover shadow-xs"
         />
       )}
       {c.resolutionNote && (

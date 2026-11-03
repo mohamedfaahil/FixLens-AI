@@ -161,7 +161,7 @@ export function NotificationsBell({ portal = "Student" }: { portal?: "Student" |
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 sm:w-96 p-0 shadow-lg">
+      <PopoverContent align="end" className="w-80 sm:w-96 p-0 shadow-float rounded-2xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-semibold text-foreground">Notifications</h4>

@@ -142,43 +142,43 @@ export function AdminAlertsPanel() {
       }
     >
       {/* Metrics Summary Strip */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-lg border bg-muted/40 p-2.5">
-          <p className="text-[11px] text-muted-foreground font-medium">Active Alerts</p>
-          <p className="text-xl font-bold text-foreground">{activeAlerts.length}</p>
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card/60 p-3 shadow-2xs">
+          <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">Active Alerts</p>
+          <p className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-foreground">{activeAlerts.length}</p>
         </div>
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-2.5">
-          <p className="text-[11px] text-destructive font-medium flex items-center gap-1">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 shadow-2xs">
+          <p className="text-[11px] text-destructive font-semibold uppercase tracking-wider flex items-center gap-1">
             <Flame className="size-3" /> Critical & Hazards
           </p>
-          <p className="text-xl font-bold text-destructive">{criticalCount}</p>
+          <p className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-destructive">{criticalCount}</p>
         </div>
-        <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-2.5">
-          <p className="text-[11px] text-purple-700 dark:text-purple-400 font-medium flex items-center gap-1">
+        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 shadow-2xs">
+          <p className="text-[11px] text-purple-700 dark:text-purple-400 font-semibold uppercase tracking-wider flex items-center gap-1">
             <AlertTriangle className="size-3" /> Facility Hotspots
           </p>
-          <p className="text-xl font-bold text-purple-700 dark:text-purple-400">{anomalyCount}</p>
+          <p className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-purple-700 dark:text-purple-400">{anomalyCount}</p>
         </div>
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
-          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 shadow-2xs">
+          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1">
             <Check className="size-3" /> Acknowledged / Closed
           </p>
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
+          <p className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">
             {acknowledgedCount + resolvedCount}
           </p>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b pb-3 mb-4 text-xs">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/80 pb-3.5 mb-4 text-xs">
         <button
           type="button"
           onClick={() => setActiveTab("all")}
           className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-all duration-150 active:scale-95",
             activeTab === "all"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           Active Alerts ({activeAlerts.length})
@@ -187,10 +187,10 @@ export function AdminAlertsPanel() {
           type="button"
           onClick={() => setActiveTab("critical")}
           className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-all duration-150 active:scale-95",
             activeTab === "critical"
-              ? "bg-destructive text-destructive-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "bg-destructive text-destructive-foreground shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           Critical Hazards ({criticalCount})
@@ -199,10 +199,10 @@ export function AdminAlertsPanel() {
           type="button"
           onClick={() => setActiveTab("anomalies")}
           className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-all duration-150 active:scale-95",
             activeTab === "anomalies"
-              ? "bg-purple-600 text-white shadow-sm"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "bg-purple-600 text-white shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           Anomalies & Hotspots ({anomalyCount})
@@ -211,10 +211,10 @@ export function AdminAlertsPanel() {
           type="button"
           onClick={() => setActiveTab("acknowledged")}
           className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-all duration-150 active:scale-95",
             activeTab === "acknowledged"
-              ? "bg-amber-600 text-white shadow-sm"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "bg-amber-600 text-white shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           Acknowledged ({acknowledgedCount})
@@ -223,10 +223,10 @@ export function AdminAlertsPanel() {
           type="button"
           onClick={() => setActiveTab("resolved")}
           className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-all duration-150 active:scale-95",
             activeTab === "resolved"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           Resolved ({resolvedCount})

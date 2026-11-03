@@ -25,14 +25,14 @@ export const Route = createFileRoute("/admin/reports")({
 function Bar({ label, value, max }: { label: string; value: number; max: number }) {
   return (
     <div className="grid grid-cols-[140px_1fr_32px] items-center gap-3 text-sm">
-      <span className="truncate text-muted-foreground">{label}</span>
-      <div className="h-2 rounded-full bg-muted">
+      <span className="truncate text-muted-foreground font-medium text-xs sm:text-sm">{label}</span>
+      <div className="h-2.5 rounded-full bg-muted/80 overflow-hidden">
         <div
-          className="h-2 rounded-full bg-primary"
+          className="h-2.5 rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-300"
           style={{ width: `${max ? (value / max) * 100 : 0}%` }}
         />
       </div>
-      <span className="text-right font-semibold text-foreground">{value}</span>
+      <span className="text-right font-bold text-foreground text-xs sm:text-sm">{value}</span>
     </div>
   );
 }

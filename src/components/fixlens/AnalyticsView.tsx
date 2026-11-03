@@ -119,7 +119,15 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
   }, [adminAlerts, cat]);
 
   const tip = {
-    contentStyle: { borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 },
+    contentStyle: {
+      backgroundColor: "var(--card)",
+      borderColor: "var(--border)",
+      color: "var(--foreground)",
+      borderRadius: 12,
+      boxShadow: "var(--shadow-card)",
+      fontSize: 12,
+    },
+    itemStyle: { color: "var(--foreground)" },
   };
 
   const handleExportSummaryCSV = () => {
@@ -184,38 +192,46 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
 
       {/* KPI Executive Summary Cards */}
       {!compact && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="surface surface-hover rounded-2xl p-4.5 text-card-foreground">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Complaints Recorded</p>
-              <ClipboardList className="size-4 text-primary" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Complaints Recorded</p>
+              <span className="grid size-8.5 place-items-center rounded-xl bg-primary/10 text-primary">
+                <ClipboardList className="size-4.5" />
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-bold">{totalInRange}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{RANGES[range]}</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-extrabold tracking-tight">{totalInRange}</p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground">{RANGES[range]}</p>
           </div>
-          <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+          <div className="surface surface-hover rounded-2xl p-4.5 text-card-foreground">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Resolution Rate</p>
-              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resolution Rate</p>
+              <span className="grid size-8.5 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="size-4.5" />
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-bold">{resolutionRate}%</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{resolvedInRange} resolved in period</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">{resolutionRate}%</p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground">{resolvedInRange} of {totalInRange} resolved in period</p>
           </div>
-          <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+          <div className="surface surface-hover rounded-2xl p-4.5 text-card-foreground">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Pending Backlog</p>
-              <Hourglass className="size-4 text-amber-600 dark:text-amber-400" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pending Backlog</p>
+              <span className="grid size-8.5 place-items-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <Hourglass className="size-4.5" />
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-bold">{pendingBacklog}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Awaiting resolution</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-extrabold tracking-tight">{pendingBacklog}</p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground">Awaiting resolution</p>
           </div>
-          <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+          <div className="surface surface-hover rounded-2xl p-4.5 text-card-foreground">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">High Priority Backlog</p>
-              <Flame className="size-4 text-destructive" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">High Priority Backlog</p>
+              <span className="grid size-8.5 place-items-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                <Flame className="size-4.5" />
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-bold text-destructive">{highPriorityPending}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Requires immediate attention</p>
+            <p className="mt-2 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-destructive">{highPriorityPending}</p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground">Requires immediate attention</p>
           </div>
         </div>
       )}

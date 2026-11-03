@@ -3,6 +3,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, Logo } from "./ui-bits";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function AuthLayout({
   title,
@@ -16,16 +17,19 @@ export function AuthLayout({
   aside?: ReactNode;
 }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-screen lg:grid-cols-2 bg-background">
       <div className="flex flex-col px-6 py-8 sm:px-12">
-        <Logo />
+        <div className="flex items-center justify-between">
+          <Logo />
+          <ThemeToggle />
+        </div>
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
-          <h1 className="text-3xl font-extrabold text-foreground">{title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{subtitle}</p>
           <div className="mt-6">{children}</div>
         </div>
       </div>
-      <div className="relative hidden overflow-hidden border-l bg-accent lg:block">
+      <div className="relative hidden overflow-hidden border-l border-border bg-muted/40 lg:block">
         <div className="grid-bg absolute inset-0" />
         <div className="relative flex h-full flex-col justify-center px-14">{aside}</div>
       </div>

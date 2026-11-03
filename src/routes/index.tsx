@@ -16,6 +16,7 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Logo, PriorityBadge, StatusBadge, DemoBadge } from "@/components/fixlens/ui-bits";
+import { ThemeToggle } from "@/components/fixlens/ThemeToggle";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -88,7 +89,9 @@ function Home() {
               How it works
             </a>
           </nav>
-          <div className="ml-auto hidden items-center gap-2 md:flex">
+          <div className="ml-auto hidden items-center gap-2.5 md:flex">
+            <ThemeToggle />
+            <div className="h-4 w-px bg-border mx-1" />
             <Button variant="ghost" asChild>
               <Link to="/admin-login">Admin Login</Link>
             </Button>
@@ -99,18 +102,20 @@ function Home() {
               <Link to="/register">Register</Link>
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto md:hidden"
-            onClick={() => setMenu((m) => !m)}
-            aria-label="Toggle menu"
-          >
-            <Menu />
-          </Button>
+          <div className="ml-auto flex items-center gap-2 md:hidden">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMenu((m) => !m)}
+              aria-label="Toggle menu"
+            >
+              <Menu />
+            </Button>
+          </div>
         </div>
         {menu && (
-          <div className="flex flex-col gap-2 border-t px-4 py-3 md:hidden">
+          <div className="flex flex-col gap-2 border-t border-border px-4 py-3 md:hidden bg-card">
             <Button variant="outline" asChild>
               <Link to="/login">Student Login</Link>
             </Button>

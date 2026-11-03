@@ -54,14 +54,20 @@ export function ComplaintList({
 
   return (
     <div>
-      <div className={`mb-4 grid gap-2 sm:grid-cols-2 ${showExport ? "lg:grid-cols-[1fr_160px_140px_130px_auto]" : "lg:grid-cols-[1fr_170px_150px_130px]"}`}>
+      <div
+        className={`mb-4 grid gap-2.5 sm:grid-cols-2 ${
+          showExport
+            ? "lg:grid-cols-[1fr_160px_140px_130px_auto]"
+            : "lg:grid-cols-[1fr_170px_150px_130px]"
+        }`}
+      >
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by ID, title or location"
+            placeholder="Search by ID, title or location..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="bg-card pl-9"
+            className="pl-9.5 h-10 rounded-xl"
             aria-label="Search complaints"
           />
         </div>
@@ -107,12 +113,12 @@ export function ComplaintList({
               exportComplaintsToCSV(list, `fixlens_filtered_complaints_${dateStr}.csv`);
               toast.success(`Exported ${list.length} filtered complaints to CSV.`);
             }}
-            className="text-xs h-10 flex items-center gap-1.5"
+            className="text-xs h-10 rounded-xl flex items-center gap-2 font-medium"
             disabled={list.length === 0}
             title={list.length === 0 ? "No complaints match filters" : `Export ${list.length} filtered complaints to CSV`}
           >
             <Download className="size-3.5" />
-            Export CSV ({list.length})
+            <span>Export CSV ({list.length})</span>
           </Button>
         )}
       </div>
@@ -120,39 +126,39 @@ export function ComplaintList({
       {complaints.length === 0 ? (
         <EmptyState
           title="No complaints found"
-          description="There are currently no maintenance complaints to display."
+          description="There are currently no maintenance complaints recorded in the system."
         />
       ) : list.length === 0 ? (
         <EmptyState
-          title="No complaints match"
-          description="Try changing the search text or filters."
+          title="No complaints match filters"
+          description="Try broadening your search query or clearing active category and status filters."
         />
       ) : (
-        <div className="surface overflow-hidden">
+        <div className="surface overflow-hidden rounded-2xl">
           <table className="hidden w-full text-sm md:table">
-            <thead className="border-b bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-border/80 bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">ID</th>
-                <th className="px-4 py-3">Complaint</th>
-                {showReporter && <th className="px-4 py-3">Reporter</th>}
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="w-8" />
+                <th className="px-5 py-3.5">ID</th>
+                <th className="px-5 py-3.5">Complaint</th>
+                {showReporter && <th className="px-5 py-3.5">Reporter</th>}
+                <th className="px-5 py-3.5">Date</th>
+                <th className="px-5 py-3.5">Priority</th>
+                <th className="px-5 py-3.5">Status</th>
+                <th className="w-8 pr-4" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/60">
               {list.map((c) => (
                 <tr
                   key={c.id}
                   onClick={() => onOpen(c)}
-                  className="cursor-pointer border-b last:border-0 hover:bg-accent/50"
+                  className="group cursor-pointer transition-colors duration-150 hover:bg-muted/50"
                 >
-                  <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">{c.id}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
+                  <td className="px-5 py-3.5 font-mono text-xs font-bold text-primary">{c.id}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2">
                       <button
-                        className="text-left font-semibold text-foreground hover:text-primary"
+                        className="text-left font-semibold text-foreground group-hover:text-primary transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpen(c);
@@ -163,20 +169,20 @@ export function ComplaintList({
                       {c.image && (
                         <span
                           title="Photo attached"
-                          className="inline-flex items-center text-primary"
+                          className="inline-flex items-center text-primary/80"
                         >
                           <ImageIcon className="size-3.5 shrink-0" />
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
                       <p className="text-xs text-muted-foreground">
                         {c.category} · {c.building}, {c.room}
                       </p>
                       {recurringMap.has(c.id) && (
                         <span
                           title={`Recurring issue: ${recurringMap.get(c.id)!.count} reports (${recurringMap.get(c.id)!.incidents} distinct incidents)`}
-                          className="inline-flex items-center gap-1 rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground"
+                          className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold text-warning-foreground"
                         >
                           <RotateCcw className="size-2.5" /> Recurring
                         </span>
@@ -184,47 +190,47 @@ export function ComplaintList({
                     </div>
                   </td>
                   {showReporter && (
-                    <td className="px-4 py-3 text-muted-foreground">{c.reporter}</td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground font-medium">{c.reporter}</td>
                   )}
-                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                  <td className="whitespace-nowrap px-5 py-3.5 text-xs text-muted-foreground font-medium">
                     {formatDate(c.date)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <PriorityBadge priority={c.priority} />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <StatusBadge status={c.status} />
                   </td>
-                  <td className="pr-3">
-                    <ChevronRight className="size-4 text-muted-foreground" />
+                  <td className="pr-4 text-right">
+                    <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <ul className="divide-y md:hidden">
+          <ul className="divide-y divide-border/60 md:hidden">
             {list.map((c) => (
               <li key={c.id}>
                 <button
                   onClick={() => onOpen(c)}
-                  className="w-full p-4 text-left hover:bg-accent/50"
+                  className="w-full p-4 text-left transition-colors active:bg-muted/70 hover:bg-muted/40"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-semibold text-primary">{c.id}</span>
+                    <span className="font-mono text-xs font-bold text-primary">{c.id}</span>
                     <span className="text-xs text-muted-foreground">{formatDate(c.date)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="mt-1 font-semibold text-foreground">{c.title}</p>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <p className="font-semibold text-foreground text-sm">{c.title}</p>
                     {c.image && <ImageIcon className="size-3.5 text-primary shrink-0" />}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {c.building}, {c.room}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {c.building}, {c.room} · {c.category}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     <PriorityBadge priority={c.priority} />
                     <StatusBadge status={c.status} />
                     {recurringMap.has(c.id) && (
-                      <span className="inline-flex items-center gap-1 rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold text-warning-foreground">
                         <RotateCcw className="size-2.5" /> Recurring ({recurringMap.get(c.id)!.count})
                       </span>
                     )}
@@ -235,7 +241,7 @@ export function ComplaintList({
           </ul>
         </div>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-3 text-xs font-medium text-muted-foreground">
         Showing {list.length} of {complaints.length} {isSupabaseConnected ? "complaints" : "demo complaints"}
       </p>
     </div>

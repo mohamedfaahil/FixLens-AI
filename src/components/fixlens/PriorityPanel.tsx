@@ -49,11 +49,11 @@ export function PredictionCard({
   });
 
   return (
-    <div className="rounded-xl border bg-card/80 backdrop-blur-xs p-4 transition-all shadow-xs">
+    <div className="rounded-2xl border border-border bg-card/85 backdrop-blur-xs p-5 transition-all shadow-card">
       {/* Header: Title and Model Status Badge */}
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-          <BrainCircuit className="size-4 text-primary" /> Suggested Priority
+          <BrainCircuit className="size-4.5 text-primary" /> Suggested Priority
         </p>
         {isLoading ? (
           <Badge

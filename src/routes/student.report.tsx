@@ -538,12 +538,16 @@ function Report() {
               </div>
             </div>
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-foreground">Urgency (Student Reported)</legend>
-              <div className="grid grid-cols-3 gap-2">
+              <legend className="mb-2 text-sm font-semibold text-foreground">Urgency (Student Reported)</legend>
+              <div className="grid grid-cols-3 gap-2.5">
                 {PRIORITIES.map((p) => (
                   <label
                     key={p}
-                    className={`cursor-pointer rounded-lg border p-2.5 text-center text-sm font-semibold transition-colors ${f.urgency === p ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:border-primary/50"}`}
+                    className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-semibold transition-all duration-150 active:scale-95 ${
+                      f.urgency === p
+                        ? "border-primary bg-primary/10 text-primary shadow-xs ring-2 ring-primary/20 font-bold"
+                        : "text-muted-foreground bg-card/60 hover:border-primary/40 hover:text-foreground"
+                    }`}
                   >
                     <input
                       type="radio"
@@ -559,32 +563,35 @@ function Report() {
               </div>
             </fieldset>
             <div>
-              <p className="mb-1.5 text-sm font-medium text-foreground">Photo (optional)</p>
+              <p className="mb-2 text-sm font-semibold text-foreground">Photo Attachment (optional)</p>
               {img ? (
                 <div className="relative inline-block">
                   <img
                     src={img}
                     alt="Attachment preview"
-                    className="h-40 rounded-lg border object-cover"
+                    className="h-44 rounded-xl border border-border object-cover shadow-xs"
                   />
                   <button
                     type="button"
                     onClick={() => setImg(undefined)}
                     aria-label="Remove image"
-                    className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-card shadow-card"
+                    className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-full bg-card/90 backdrop-blur-xs text-foreground shadow-card hover:bg-card hover:text-destructive transition-colors"
                   >
                     <X className="size-4" />
                   </button>
                 </div>
               ) : (
-                <label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed bg-muted/30 py-6 text-sm text-muted-foreground hover:border-primary">
-                  <ImagePlus className="size-6" />
-                  <span className="mt-1">Click to attach an image (max 5 MB)</span>
+                <label className="flex cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed border-border/80 bg-card/40 py-8 text-sm text-muted-foreground transition-all duration-150 hover:border-primary/60 hover:bg-primary/[0.02]">
+                  <div className="grid size-12 place-items-center rounded-xl bg-muted/60 text-primary mb-2">
+                    <ImagePlus className="size-6" />
+                  </div>
+                  <span className="font-medium text-foreground">Click or drop to attach a photo</span>
+                  <span className="mt-0.5 text-xs text-muted-foreground">PNG, JPG, or WEBP up to 5 MB</span>
                   <input type="file" accept="image/*" className="sr-only" onChange={onFile} />
                 </label>
               )}
               <FieldError msg={err.image} />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Stored securely in the private complaint-images bucket.
               </p>
             </div>

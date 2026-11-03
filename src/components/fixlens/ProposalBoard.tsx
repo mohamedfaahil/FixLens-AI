@@ -43,10 +43,10 @@ export function VoteButton({ p }: { p: Proposal }) {
       }}
       aria-label={voted ? "You supported this proposal" : "Support this proposal"}
       className={cn(
-        "flex w-14 shrink-0 flex-col items-center rounded-lg border py-1.5 text-sm font-bold transition-colors",
+        "flex w-14 shrink-0 flex-col items-center rounded-xl border py-2 text-sm font-bold transition-all duration-150 active:scale-95 shadow-2xs",
         voted
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-card text-foreground hover:border-primary hover:text-primary",
+          ? "border-primary bg-primary text-primary-foreground shadow-xs"
+          : "bg-card text-foreground hover:border-primary/60 hover:text-primary",
         closed && !voted && "cursor-not-allowed opacity-50",
       )}
     >
@@ -145,7 +145,7 @@ export function ProposalBoard() {
             <article
               key={p.id}
               onClick={() => setOpen(p)}
-              className="surface flex cursor-pointer gap-4 p-5 transition-shadow hover:shadow-float"
+              className="surface surface-hover rounded-2xl flex cursor-pointer gap-4 p-5 transition-all duration-200"
             >
               <VoteButton p={p} />
               <div className="min-w-0 flex-1">
