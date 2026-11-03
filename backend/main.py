@@ -66,21 +66,55 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS: allow all web origins (Vercel, localhost, preview domains)
+# --------------------------------------------------------------------
+# CORS Configuration: Production Hardened
+# --------------------------------------------------------------------
 allowed_origins_env = os.environ.get("ALLOWED_ORIGINS") or os.environ.get("CORS_ORIGINS")
-if allowed_origins_env:
-    origins_list = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
-else:
-    origins_list = ["*"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins_list,
-    allow_origin_regex=r"https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+is_production = (
+    os.environ.get("RENDER") == "true"
+    or os.environ.get("ENVIRONMENT") == "production"
+    or os.environ.get("NODE_ENV") == "production"
 )
+
+if allowed_origins_env:
+    # Explicit allowed origins parsed from environment (Production / Staging)
+    origins_list = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins_list,
+        allow_origin_regex=None,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+elif is_production:
+    # Production without ALLOWED_ORIGINS: Reject wildcard access for security
+    print("[WARNING] Running in production mode but ALLOWED_ORIGINS is not set! Denying open public origins.")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[],
+        allow_origin_regex=None,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
+else:
+    # Local development without ALLOWED_ORIGINS: Strictly permit localhost and 127.0.0.1
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 class ComplaintPredictRequest(BaseModel):
     description: str = Field(..., min_length=3, description="Detailed description of the maintenance issue")

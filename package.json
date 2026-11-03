@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:backend": "python backend/test_api.py",
+    "test:all": "vitest run && python backend/test_api.py"
   },
   "overrides": {
     "rolldown": "1.2.1"
