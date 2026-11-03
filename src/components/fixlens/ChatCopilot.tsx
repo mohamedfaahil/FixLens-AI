@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Sparkles,
   X,
@@ -19,6 +19,7 @@ import {
   Mic,
   MicOff,
   ClipboardList,
+  Edit3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,8 @@ export function ChatCopilot({ portal, user }: Props) {
   const [submittingDraftId, setSubmittingDraftId] = useState<string | null>(null);
   const [submittedTickets, setSubmittedTickets] = useState<Record<string, string>>({});
 
-  const { complaints, proposals, addComplaint, currentStudent } = useDemoStore();
+  const { complaints, proposals, addComplaint, currentStudent, setReportDraft } = useDemoStore();
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -205,6 +207,21 @@ export function ChatCopilot({ portal, user }: Props) {
         timestamp: new Date(),
       },
     ]);
+  };
+
+  const handleEditInForm = (card: NonNullable<ChatMessage["actionCard"]> & { type: "complaint-draft" }) => {
+    setReportDraft({
+      title: card.title,
+      description: card.description,
+      category: card.category,
+      building: card.building,
+      room: card.room,
+      urgency: card.urgency,
+      affected: String(card.affected),
+    });
+    setIsOpen(false);
+    navigate({ to: "/student/report" });
+    toast.info("Complaint draft loaded into report form for your review.");
   };
 
   const handleSubmitDraft = async (
@@ -464,31 +481,52 @@ export function ChatCopilot({ portal, user }: Props) {
                               <span>Registered: {submittedTickets[m.id]}</span>
                             </div>
                           ) : (
-                            <Button
-                              size="sm"
-                              className="w-full gap-1.5 text-xs h-8"
-                              disabled={submittingDraftId === m.id}
-                              onClick={() =>
-                                handleSubmitDraft(
-                                  m.id,
-                                  m.actionCard as NonNullable<ChatMessage["actionCard"]> & {
-                                    type: "complaint-draft";
-                                  },
-                                )
-                              }
-                            >
-                              {submittingDraftId === m.id ? (
-                                <>
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                  <span>Submitting to Queue...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="size-3.5" />
-                                  <span>Confirm & Submit Complaint</span>
-                                </>
+                            <div className="flex items-center gap-2 pt-1">
+                              {portal === "Student" && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 gap-1.5 text-xs h-8 border-primary/30 text-primary hover:bg-primary/5"
+                                  onClick={() =>
+                                    handleEditInForm(
+                                      m.actionCard as NonNullable<ChatMessage["actionCard"]> & {
+                                        type: "complaint-draft";
+                                      },
+                                    )
+                                  }
+                                >
+                                  <Edit3 className="size-3.5" />
+                                  <span>Review & Edit</span>
+                                </Button>
                               )}
-                            </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="flex-1 gap-1.5 text-xs h-8"
+                                disabled={submittingDraftId === m.id}
+                                onClick={() =>
+                                  handleSubmitDraft(
+                                    m.id,
+                                    m.actionCard as NonNullable<ChatMessage["actionCard"]> & {
+                                      type: "complaint-draft";
+                                    },
+                                  )
+                                }
+                              >
+                                {submittingDraftId === m.id ? (
+                                  <>
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    <span>Submitting...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="size-3.5" />
+                                    <span>Confirm & Submit</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </div>
                       )}

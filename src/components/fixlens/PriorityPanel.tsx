@@ -116,6 +116,11 @@ export function PredictionCard({
                 {(confidence * 100).toFixed(1)}% Confidence
               </span>
             )}
+            {isTrainedModel && source && (
+              <span className="rounded bg-muted/70 px-2 py-0.5 text-[11px] font-medium text-foreground border border-border/60">
+                Source: {source}
+              </span>
+            )}
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <CheckCircle2 className="size-3 text-muted-foreground" />
               Confirmed by administration

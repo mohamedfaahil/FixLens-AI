@@ -26,6 +26,7 @@ import {
   selectCls,
 } from "@/components/fixlens/ui-bits";
 import { MethodExplainer, PredictionCard } from "@/components/fixlens/PriorityPanel";
+import { BuildingCombobox } from "@/components/fixlens/BuildingCombobox";
 import { useDemoStore } from "@/lib/demo-store";
 import { findPotentialDuplicates } from "@/lib/triage-engine";
 import { getAdminAuthState } from "@/lib/supabase-auth";
@@ -68,6 +69,15 @@ function Report() {
   const [img, setImg] = useState<string | undefined>(() => reportDraft?.image);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(() => reportDraft?.imageFile);
   const [isSeparateIncidentConfirmed, setIsSeparateIncidentConfirmed] = useState(false);
+
+  // Sync draft if updated by Copilot action
+  useEffect(() => {
+    if (reportDraft) {
+      setF(reportDraft);
+      if (reportDraft.image) setImg(reportDraft.image);
+      if (reportDraft.imageFile) setSelectedFile(reportDraft.imageFile);
+    }
+  }, [reportDraft]);
   const [err, setErr] = useState<
     Partial<
       Record<
@@ -501,12 +511,19 @@ function Report() {
                 <Label htmlFor="b" className="mb-1.5 block">
                   Building
                 </Label>
-                <select id="b" className={selectCls} value={f.building} onChange={set("building")}>
-                  <option value="">Select…</option>
-                  {BUILDINGS.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
+                <BuildingCombobox
+                  id="b"
+                  value={f.building}
+                  onChange={(bldg) => {
+                    const next = { ...f, building: bldg };
+                    setF(next);
+                    setReportDraft(next);
+                    if (err.building) {
+                      setErr((prev) => ({ ...prev, building: undefined }));
+                    }
+                  }}
+                  hasError={!!err.building}
+                />
                 <FieldError msg={err.building} />
               </div>
               <div>

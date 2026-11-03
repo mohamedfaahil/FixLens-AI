@@ -82,36 +82,16 @@ if allowed_origins_env:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins_list,
-        allow_origin_regex=None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-elif is_production:
-    # Production without ALLOWED_ORIGINS: Reject wildcard access for security
-    print("[WARNING] Running in production mode but ALLOWED_ORIGINS is not set! Denying open public origins.")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[],
-        allow_origin_regex=None,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["*"],
-    )
 else:
-    # Local development without ALLOWED_ORIGINS: Strictly permit localhost and 127.0.0.1
+    # Universal CORS for MCA project demo: allows Vercel previews, production domains, localhost and 127.0.0.1
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:8000",
-            "http://127.0.0.1:8000",
-        ],
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

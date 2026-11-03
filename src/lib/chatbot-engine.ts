@@ -67,6 +67,142 @@ export interface ChatMessage {
       };
 }
 
+// Comprehensive Defect & Problem Keywords
+export const DEFECT_KEYWORDS = [
+  // Water & Plumbing defects
+  "overflow",
+  "overflowing",
+  "leak",
+  "leaking",
+  "leakage",
+  "seep",
+  "seeping",
+  "seepage",
+  "dripping",
+  "clog",
+  "clogged",
+  "choke",
+  "choked",
+  "pipe blockage",
+  "drain blockage",
+  "blocked",
+  "drainage",
+  "drain",
+  "gutter",
+  "sewer",
+  "sewage",
+  "no water",
+  "dirty water",
+
+  // Electrical defects
+  "spark",
+  "sparking",
+  "sparked",
+  "burn",
+  "burnt",
+  "burning",
+  "shock",
+  "short circuit",
+  "power cut",
+  "no power",
+  "no electricity",
+  "voltage",
+  "flicker",
+  "flickering",
+  "tripped",
+  "tripping",
+  "blown",
+  "not working",
+  "wont work",
+  "won't work",
+  "stopped",
+  "dead",
+  "cut wire",
+  "hanging wire",
+  "loose wire",
+  "ac not cooling",
+
+  // Physical equipment damage
+  "broken",
+  "broke",
+  "break",
+  "damaged",
+  "damage",
+  "faulty",
+  "fault",
+  "shattered",
+  "crack",
+  "cracked",
+  "pothole",
+  "stuck",
+  "jammed",
+  "loose",
+  "hanging",
+
+  // Cleaning & hygiene
+  "dirty",
+  "dustbin",
+  "garbage",
+  "trash",
+  "waste",
+  "litter",
+  "smell",
+  "smelling",
+  "stink",
+  "stinking",
+  "foul",
+
+  // Network & Wi-Fi
+  "no wifi",
+  "no internet",
+  "wifi disconnected",
+  "internet down",
+  "portal down",
+
+  // Safety hazards
+  "danger",
+  "hazard",
+  "unsafe",
+  "risk",
+  "fire",
+  "smoke",
+];
+
+// Facility nouns
+export const FACILITY_NOUNS = [
+  "drainage",
+  "drain",
+  "pipe",
+  "tap",
+  "water",
+  "flush",
+  "toilet",
+  "washroom",
+  "sink",
+  "socket",
+  "switch",
+  "plug",
+  "wire",
+  "light",
+  "bulb",
+  "tubelight",
+  "fan",
+  "ac",
+  "cooler",
+  "wifi",
+  "router",
+  "internet",
+  "chair",
+  "desk",
+  "table",
+  "bench",
+  "door",
+  "window",
+  "projector",
+  "elevator",
+  "lift",
+];
+
 /**
  * Extracts campus maintenance parameters from natural language user input.
  */
@@ -87,144 +223,8 @@ export function extractComplaintParams(input: string): {
     /^(show|list|view|display|check|track|all|see|what did i|my complaints|complaints i|how to|where is|who is|can i|tell me|explain|how many)\b/i;
   const isAskingInquiry = inquiryRegex.test(lower);
 
-  // 2. Comprehensive Defect & Problem Keywords
-  const defectKeywords = [
-    // Water & Plumbing defects
-    "overflow",
-    "overflowing",
-    "leak",
-    "leaking",
-    "leakage",
-    "seep",
-    "seeping",
-    "seepage",
-    "dripping",
-    "clog",
-    "clogged",
-    "choke",
-    "choked",
-    "block",
-    "blocked",
-    "drainage",
-    "drain",
-    "gutter",
-    "sewer",
-    "sewage",
-    "no water",
-    "dirty water",
-
-    // Electrical defects
-    "spark",
-    "sparking",
-    "sparked",
-    "burn",
-    "burnt",
-    "burning",
-    "shock",
-    "short circuit",
-    "power cut",
-    "no power",
-    "no electricity",
-    "voltage",
-    "flicker",
-    "flickering",
-    "tripped",
-    "tripping",
-    "blown",
-    "not working",
-    "wont work",
-    "won't work",
-    "stopped",
-    "dead",
-    "cut wire",
-    "hanging wire",
-    "loose wire",
-    "ac not cooling",
-
-    // Physical equipment damage
-    "broken",
-    "broke",
-    "break",
-    "damaged",
-    "damage",
-    "faulty",
-    "fault",
-    "shattered",
-    "crack",
-    "cracked",
-    "pothole",
-    "stuck",
-    "jammed",
-    "loose",
-    "hanging",
-
-    // Cleaning & hygiene
-    "dirty",
-    "dustbin",
-    "garbage",
-    "trash",
-    "waste",
-    "litter",
-    "smell",
-    "smelling",
-    "stink",
-    "stinking",
-    "foul",
-
-    // Network & Wi-Fi
-    "no wifi",
-    "no internet",
-    "wifi disconnected",
-    "internet down",
-    "portal down",
-
-    // Safety hazards
-    "danger",
-    "hazard",
-    "unsafe",
-    "risk",
-    "fire",
-    "smoke",
-  ];
-
-  const hasDefectKeyword = defectKeywords.some((k) => lower.includes(k));
-
-  // Facility nouns
-  const facilityNouns = [
-    "drainage",
-    "drain",
-    "pipe",
-    "tap",
-    "water",
-    "flush",
-    "toilet",
-    "washroom",
-    "sink",
-    "socket",
-    "switch",
-    "plug",
-    "wire",
-    "light",
-    "bulb",
-    "tubelight",
-    "fan",
-    "ac",
-    "cooler",
-    "wifi",
-    "router",
-    "internet",
-    "chair",
-    "desk",
-    "table",
-    "bench",
-    "door",
-    "window",
-    "projector",
-    "elevator",
-    "lift",
-  ];
-
-  const hasFacilityNoun = facilityNouns.some((n) => lower.includes(n));
+  const hasDefectKeyword = DEFECT_KEYWORDS.some((k) => lower.includes(k));
+  const hasFacilityNoun = FACILITY_NOUNS.some((n) => lower.includes(n));
 
   // It is a complaint intent if:
   // - It has a defect keyword (e.g. "overflow", "leaking", "broken", "sparking")
@@ -337,42 +337,62 @@ export function extractComplaintParams(input: string): {
     if (lower.includes("library")) {
       detectedBuilding = "Main Library";
       hasExplicitBuilding = true;
-    } else if (lower.includes("boys hostel") || lower.includes("mens hostel")) {
-      detectedBuilding = "Boys Hostel";
+    } else if (lower.includes("mechanical") || /\bms\b/i.test(lower) || lower.includes("ms block")) {
+      detectedBuilding = "Mechanical Science (MS) Block";
       hasExplicitBuilding = true;
-    } else if (lower.includes("girls hostel") || lower.includes("ladies hostel")) {
-      detectedBuilding = "Girls Hostel";
+    } else if (lower.includes("electrical") || /\bes\b/i.test(lower) || lower.includes("es block")) {
+      detectedBuilding = "Electrical Science (ES) Block";
       hasExplicitBuilding = true;
-    } else if (
-      lower.includes("canteen") ||
-      lower.includes("cafeteria") ||
-      lower.includes("food court")
-    ) {
-      detectedBuilding = "Cafeteria";
+    } else if (lower.includes("structural") || /\bse\b/i.test(lower) || lower.includes("se block")) {
+      detectedBuilding = "Structural Engineering (SE) Block";
       hasExplicitBuilding = true;
-    } else if (
-      lower.includes("gym") ||
-      lower.includes("ground") ||
-      lower.includes("sports")
-    ) {
+    } else if (lower.includes("life science") || /\bls\b/i.test(lower) || lower.includes("ls block")) {
+      detectedBuilding = "Life Science (LS) Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("pharmacy")) {
+      detectedBuilding = "Pharmacy Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("architecture")) {
+      detectedBuilding = "Architecture Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("basic science")) {
+      detectedBuilding = "Basic Science Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("annexure")) {
+      detectedBuilding = "Annexure Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("auditorium")) {
+      detectedBuilding = "Main Auditorium";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("canteen") || lower.includes("cafeteria")) {
+      detectedBuilding = "Main Canteen";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("convention")) {
+      detectedBuilding = "Convention Centre Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("sm block") || /\bsm\b/i.test(lower)) {
+      detectedBuilding = "SM Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("gym") || lower.includes("ground") || lower.includes("sports")) {
       detectedBuilding = "Sports Complex";
-      hasExplicitBuilding = true;
-    } else if (lower.includes("mca")) {
-      detectedBuilding = "MCA Block";
       hasExplicitBuilding = true;
     } else if (lower.includes("admin")) {
       detectedBuilding = "Admin Block";
+      hasExplicitBuilding = true;
+    } else if (lower.includes("cs block") || /\bcs\b/i.test(lower)) {
+      detectedBuilding = "CS Block";
       hasExplicitBuilding = true;
     }
   }
 
   // Room / Specific Location detection
   let room = "General Area / Grounds";
-  const roomMatch = input.match(
-    /(?:(?:room|lab|hall|floor|cabin|class)\s*(?:no\.?|number)?\s*([a-z0-9\-]+))|(?:([0-9]+(?:st|nd|rd|th)?|ground)\s*(?:floor|floor\s*washroom|lab|hall|room))|(?:near\s*(?:the\s*)?[a-z0-9\s]+)/i,
-  );
-  if (roomMatch) {
-    room = roomMatch[0].trim();
+  const roomPattern =
+    input.match(/\b(?:room|lab|hall|floor|cabin|classroom)\s*(?:no\.?|number)?\s*([0-9]+[a-z0-9\-]*)\b/i) ||
+    input.match(/\b([0-9]+(?:st|nd|rd|th)?|ground)\s*(?:floor|floor\s*washroom|lab|hall|room)\b/i) ||
+    input.match(/\bnear\s*(?:the\s*)?[a-z0-9\s]+\b/i);
+  if (roomPattern) {
+    room = roomPattern[0].trim();
   }
 
   // Urgency detection
@@ -484,7 +504,43 @@ export async function processUserMessage({
   }
 
   // ==========================================
-  // 2. GRATITUDE & CLOSURE
+  // 2. REPORTING ASSISTANCE / HOW TO REPORT
+  // ==========================================
+  const isHelpReporting =
+    /\b(how\s*to\s*report|help\s*(me\s*)?(to\s*)?(report|file)|can\s*you\s*help\s*(me\s*)?(to\s*)?(report|file)|how\s*can\s*i\s*(report|file))\b/i.test(
+      lower,
+    ) ||
+    lower.includes("help reporting") ||
+    lower.includes("help me report") ||
+    lower.includes("how to report") ||
+    lower.includes("how can i report") ||
+    lower.includes("help me file") ||
+    lower === "report an issue" ||
+    lower === "report a complaint" ||
+    lower === "⚡ report an issue" ||
+    lower === "i want to report a complaint" ||
+    lower === "i want to report an issue";
+
+  if (isHelpReporting) {
+    return {
+      id,
+      sender: "bot",
+      text: `🛠️ **Reporting a Campus Maintenance Issue:**\n\nYou can report an issue in two easy ways:\n\n` +
+        `1. **Directly here in chat:** Describe what is broken, where it is located, and which building (e.g. *"Broken classroom fan in CS Block Room 204"* or *"Water leak in Main Library 2nd floor"*). I will classify the category, evaluate the priority using our trained ML model, and generate a draft card for you.\n` +
+        `2. **Using the Report Form:** You can also go to the **Report Complaint** page from the sidebar navigation to submit with photos and exact coordinates.\n\n` +
+        `What maintenance issue would you like to report?`,
+      timestamp,
+      quickReplies: [
+        "Broken fan in CS Block",
+        "Water leak in Main Library",
+        "Sparking socket in ES Block",
+        "Broken bench in MS Block",
+      ],
+    };
+  }
+
+  // ==========================================
+  // 3. GRATITUDE & CLOSURE
   // ==========================================
   if (
     /^(thanks|thank you|thx|awesome|great|perfect|ok|okay|got it|sounds good|bye)\b/i.test(lower) &&
@@ -499,16 +555,66 @@ export async function processUserMessage({
   }
 
   // ==========================================
-  // 3. MULTI-TURN CONTEXT RESOLUTION (Student or Admin location follow-up)
+  // 4. INITIATE COMPLAINT FOR SPECIFIC LOCATION
+  // ==========================================
+  const isInitiateForLocation =
+    /\b(prepare|create|file|draft|register)\b.*\b(complaint|ticket|issue)\b.*\b(for|in|at)\b/i.test(
+      lower,
+    ) ||
+    /^(prepare|create|file|draft|register)\s*(a\s*)?(complaint|ticket|issue)\s*(for|in|at)\s*/i.test(
+      lower,
+    );
+  const hasDefect = DEFECT_KEYWORDS.some((k) => lower.includes(k));
+
+  if (isInitiateForLocation && !hasDefect) {
+    const loc = extractComplaintParams(lower);
+    const targetBuilding = loc.hasExplicitBuilding ? loc.building : "Mechanical Science (MS) Block";
+    return {
+      id,
+      sender: "bot",
+      text: `Sure! I'm ready to prepare a complaint for **${targetBuilding}**. 📍\n\nWhat specific maintenance issue occurred? (e.g. *"Broken classroom fan in Room 201"* or *"Water leaking from sink"*):`,
+      timestamp,
+      pendingContext: {
+        description: `Maintenance issue at ${targetBuilding}`,
+        category: "Other",
+        urgency: "Medium",
+        affected: 1,
+      },
+      quickReplies: [
+        `Broken fan in ${targetBuilding}`,
+        `Light not working in ${targetBuilding}`,
+        `Water leak in ${targetBuilding}`,
+        `Wi-Fi down in ${targetBuilding}`,
+      ],
+    };
+  }
+
+  // ==========================================
+  // 5. MULTI-TURN CONTEXT RESOLUTION (Student or Admin location/defect follow-up)
   // ==========================================
   if (pendingContext) {
     const locExtracted = extractComplaintParams(query);
-    const combinedDesc = `${pendingContext.description} (Location details: ${query})`;
-    const resolvedBuilding = locExtracted.hasExplicitBuilding
-      ? locExtracted.building
-      : "Main Library";
-    const resolvedRoom =
-      locExtracted.room !== "General Area / Grounds" ? locExtracted.room : query;
+    const isBuildingPending = pendingContext.description.startsWith("Maintenance issue at ");
+
+    let resolvedBuilding: Building;
+    let resolvedCategory: Category;
+    let combinedDesc: string;
+    let resolvedRoom: string;
+
+    if (isBuildingPending) {
+      const explicitBuilding = pendingContext.description.replace("Maintenance issue at ", "").trim() as Building;
+      resolvedBuilding = locExtracted.hasExplicitBuilding ? locExtracted.building : explicitBuilding;
+      resolvedCategory = locExtracted.category !== "Other" ? locExtracted.category : "General";
+      combinedDesc = query;
+      resolvedRoom = locExtracted.room !== "General Area / Grounds" ? locExtracted.room : "General Area";
+    } else {
+      resolvedBuilding = locExtracted.hasExplicitBuilding
+        ? locExtracted.building
+        : "Main Library";
+      resolvedCategory = pendingContext.category;
+      combinedDesc = `${pendingContext.description} (Location details: ${query})`;
+      resolvedRoom = locExtracted.room !== "General Area / Grounds" ? locExtracted.room : query;
+    }
 
     let predictedPriority: Priority = pendingContext.urgency;
     let confidence: number | undefined;
@@ -517,9 +623,9 @@ export async function processUserMessage({
     try {
       const mlRes: MLPredictionResult = await predictComplaintPriority({
         description: combinedDesc,
-        category: pendingContext.category,
-        urgency: pendingContext.urgency,
-        affected: pendingContext.affected,
+        category: resolvedCategory,
+        urgency: locExtracted.urgency !== "Medium" ? locExtracted.urgency : pendingContext.urgency,
+        affected: locExtracted.affected > 1 ? locExtracted.affected : pendingContext.affected,
       });
       predictedPriority = mlRes.priority;
       confidence = mlRes.confidence;
@@ -528,30 +634,30 @@ export async function processUserMessage({
       predictedPriority = pendingContext.urgency;
     }
 
-    const title = `${pendingContext.category} issue at ${resolvedBuilding}`;
+    const title = `${resolvedCategory} issue at ${resolvedBuilding}`;
 
     return {
       id,
       sender: "bot",
-      text: `Thanks for providing the location! 🎯\n\nI've finalized your complaint draft with our **AI Priority Prediction Model**:\n\n` +
-        `• **Category:** ${pendingContext.category}\n` +
+      text: `Thanks for providing the details! 🎯\n\nI've finalized your complaint draft with our **AI Priority Prediction Model**:\n\n` +
+        `• **Category:** ${resolvedCategory}\n` +
         `• **Location:** ${resolvedBuilding} (${resolvedRoom})\n` +
         `• **AI Predicted Priority:** **${predictedPriority}**${
           confidence ? ` (${(confidence * 100).toFixed(0)}% confidence)` : ""
         }\n` +
-        `• **Impact:** ${pendingContext.affected} person(s)\n\n` +
-        `Click **"Confirm & Submit Complaint"** below to dispatch it immediately:`,
+        `• **Impact:** ${locExtracted.affected || pendingContext.affected} person(s)\n\n` +
+        `Click **"Confirm & Submit"** below to dispatch it immediately or **"Review & Edit"** to customize it in the complaint form:`,
       timestamp,
       pendingContext: null,
       actionCard: {
         type: "complaint-draft",
         title,
         description: combinedDesc,
-        category: pendingContext.category,
+        category: resolvedCategory,
         building: resolvedBuilding,
         room: resolvedRoom,
-        urgency: pendingContext.urgency,
-        affected: pendingContext.affected,
+        urgency: locExtracted.urgency !== "Medium" ? locExtracted.urgency : pendingContext.urgency,
+        affected: locExtracted.affected || pendingContext.affected,
         predictedPriority,
         confidence,
         signals,
@@ -924,8 +1030,8 @@ export async function processUserMessage({
         quickReplies: [
           "Main Library Ground Floor",
           "CS Block Lab 2",
-          "Boys Hostel Floor 1",
-          "Girls Hostel Floor 2",
+          "Mechanical Science (MS) Block",
+          "Electrical Science (ES) Block",
           "Admin Block",
         ],
       };

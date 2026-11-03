@@ -13,14 +13,24 @@ export type Category = (typeof CATEGORIES)[number];
 
 export const BUILDINGS = [
   "CS Block",
-  "MCA Block",
-  "Main Library",
+  "SM Block",
+  "Mechanical Science (MS) Block",
+  "Electrical Science (ES) Block",
+  "Structural Engineering (SE) Block",
+  "Life Science (LS) Block",
+  "Pharmacy Block",
+  "Architecture Block",
+  "Basic Science Block",
+  "Annexure Block",
   "Admin Block",
-  "Boys Hostel",
-  "Girls Hostel",
-  "Cafeteria",
+  "Main Library",
+  "Main Auditorium",
+  "Main Canteen",
+  "Convention Centre Block",
   "Sports Complex",
 ] as const;
+
+export type Building = (typeof BUILDINGS)[number] | (string & {});
 
 export const DEPARTMENTS = [
   "Computer Applications (MCA)",
