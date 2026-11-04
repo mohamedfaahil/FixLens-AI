@@ -81,8 +81,7 @@ export function AdminLayout() {
           <ShieldAlert className="mx-auto size-10 text-destructive" />
           <h2 className="text-lg font-bold text-foreground">Access Restricted</h2>
           <p className="text-sm text-muted-foreground">
-            The administrator portal requires verified authentication. Access is restricted to{" "}
-            <strong>{ADMIN_ACCOUNT.email}</strong>.
+            The administrator portal requires verified authentication. Access is restricted to authorized campus administrators.
           </p>
           <div className="flex justify-center gap-2">
             <Button onClick={() => navigate({ to: "/admin-login" })}>

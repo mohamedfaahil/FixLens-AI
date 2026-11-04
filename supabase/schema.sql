@@ -1158,3 +1158,4 @@ REVOKE ALL ON FUNCTION public.provision_initial_admin(TEXT) FROM authenticated;
 
 -- Execute initial provisioning check immediately (succeeds if user already exists)
 SELECT public.provision_initial_admin('adminfix@gmail.com');
+SELECT public.provision_initial_admin('adminfixes@gmail.com');

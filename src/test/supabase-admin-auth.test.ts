@@ -4,6 +4,8 @@ import {
   signOutAdmin,
   getAdminAuthState,
   ADMIN_ACCOUNT,
+  ADMIN_EMAILS,
+  isAdminEmail,
 } from "../lib/supabase-auth";
 import { supabase } from "../integrations/supabase/client";
 
@@ -16,6 +18,15 @@ describe("FixLens AI — Supabase Admin Authentication & Route Protection", () =
     expect(ADMIN_ACCOUNT.email).toBe("adminfix@gmail.com");
     // Ensure no password property exists on the exported object
     expect((ADMIN_ACCOUNT as Record<string, unknown>).password).toBeUndefined();
+  });
+
+  it("exports whitelisted administrator emails including adminfix and adminfixes", () => {
+    expect(ADMIN_EMAILS).toContain("adminfix@gmail.com");
+    expect(ADMIN_EMAILS).toContain("adminfixes@gmail.com");
+    expect(isAdminEmail("adminfix@gmail.com")).toBe(true);
+    expect(isAdminEmail("ADMINFIXES@GMAIL.COM ")).toBe(true);
+    expect(isAdminEmail("student@campus.edu")).toBe(false);
+    expect(isAdminEmail(null)).toBe(false);
   });
 
   it("strictly rejects non-admin accounts before contacting auth provider", async () => {
@@ -73,6 +84,56 @@ describe("FixLens AI — Supabase Admin Authentication & Route Protection", () =
     const res = await signInAdmin("adminfix@gmail.com", "ValidAdminPass");
     expect(res.success).toBe(true);
     expect(res.user).toBeDefined();
+  });
+
+  it("authenticates secondary administrator adminfixes@gmail.com successfully", async () => {
+    const mockUser = {
+      id: "admin-uuid-5678",
+      email: "adminfixes@gmail.com",
+      app_metadata: { role: "admin" },
+      user_metadata: {},
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    };
+
+    const mockSession = {
+      access_token: "mock-jwt-token-fixes",
+      refresh_token: "mock-refresh-token-fixes",
+      expires_in: 3600,
+      token_type: "bearer",
+      user: mockUser,
+    };
+
+    vi.spyOn(supabase.auth, "signInWithPassword").mockResolvedValueOnce({
+      data: { user: mockUser as any, session: mockSession as any },
+      error: null,
+    });
+
+    const res = await signInAdmin("adminfixes@gmail.com", "ValidAdminFixesPass");
+    expect(res.success).toBe(true);
+    expect(res.user).toBeDefined();
+  });
+
+  it("verifies live Supabase Auth session in getAdminAuthState for adminfixes@gmail.com", async () => {
+    const mockUser = {
+      id: "admin-uuid-5678",
+      email: "adminfixes@gmail.com",
+      app_metadata: { role: "admin" },
+    };
+
+    vi.spyOn(supabase.auth, "getSession").mockResolvedValueOnce({
+      data: {
+        session: {
+          access_token: "valid-token-fixes",
+          user: mockUser as any,
+        } as any,
+      },
+      error: null,
+    });
+
+    const state = await getAdminAuthState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.email).toBe("adminfixes@gmail.com");
   });
 
   it("verifies live Supabase Auth session in getAdminAuthState", async () => {

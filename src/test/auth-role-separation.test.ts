@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   signInAdmin,
   signInStudent,
+  signUpStudent,
   signOutAdmin,
   signOutStudent,
   getAdminAuthState,
@@ -20,6 +21,13 @@ describe("FixLens AI — Admin & Student Authentication Session Separation", () 
   const MOCK_ADMIN_USER = {
     id: "admin-uuid-0001",
     email: ADMIN_ACCOUNT.email,
+    app_metadata: { role: "admin" },
+    user_metadata: { full_name: "FixLens Administrator" },
+  };
+
+  const MOCK_ADMINFIXES_USER = {
+    id: "admin-uuid-0002",
+    email: "adminfixes@gmail.com",
     app_metadata: { role: "admin" },
     user_metadata: { full_name: "FixLens Administrator" },
   };
@@ -51,6 +59,28 @@ describe("FixLens AI — Admin & Student Authentication Session Separation", () 
       const adminAuth = await getAdminAuthState();
       expect(adminAuth.isAuthenticated).toBe(true);
       expect(adminAuth.email).toBe(ADMIN_ACCOUNT.email);
+
+      // 2. Student auth state MUST NOT treat an Admin session as a student
+      const studentAuth = await getStudentAuthState();
+      expect(studentAuth.isAuthenticated).toBe(false);
+      expect(studentAuth.user).toBeUndefined();
+    });
+
+    it("Secondary admin session (adminfixes@gmail.com) is verified by getAdminAuthState and strictly rejected by getStudentAuthState", async () => {
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+        data: {
+          session: {
+            access_token: "adminfixes-token",
+            user: MOCK_ADMINFIXES_USER as any,
+          } as any,
+        },
+        error: null,
+      });
+
+      // 1. Admin auth state must be authenticated
+      const adminAuth = await getAdminAuthState();
+      expect(adminAuth.isAuthenticated).toBe(true);
+      expect(adminAuth.email).toBe("adminfixes@gmail.com");
 
       // 2. Student auth state MUST NOT treat an Admin session as a student
       const studentAuth = await getStudentAuthState();
@@ -129,6 +159,22 @@ describe("FixLens AI — Admin & Student Authentication Session Separation", () 
       expect(res.error).toContain("Access denied");
       expect(res.error).toContain("Administrator Login");
       expect(signInSpy).not.toHaveBeenCalled();
+
+      // Also verify adminfixes@gmail.com is strictly rejected
+      const resFixes = await signInStudent("adminfixes@gmail.com", "anyPassword123");
+      expect(resFixes.success).toBe(false);
+      expect(resFixes.error).toContain("Access denied");
+      expect(resFixes.error).toContain("Administrator Login");
+
+      // Verify signUpStudent rejects adminfixes@gmail.com
+      const resSignUp = await signUpStudent({
+        email: "adminfixes@gmail.com",
+        password: "Password123!",
+        fullName: "Admin Fixes",
+        department: "Administration",
+      });
+      expect(resSignUp.success).toBe(false);
+      expect(resSignUp.error).toContain("reserved for system administration");
     });
 
     it("signInStudent signs out and rejects if authenticated user has admin role in app_metadata", async () => {

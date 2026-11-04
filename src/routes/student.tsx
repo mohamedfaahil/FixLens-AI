@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/fixlens/PortalShell";
 import { useDemoStore } from "@/lib/demo-store";
-import { getStudentAuthState, getAdminAuthState, ADMIN_ACCOUNT } from "@/lib/supabase-auth";
+import { getStudentAuthState, getAdminAuthState } from "@/lib/supabase-auth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 

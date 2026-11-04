@@ -11,6 +11,26 @@ export const ADMIN_ACCOUNT = {
   role: "Campus Maintenance Administrator",
 };
 
+/**
+ * Whitelist of authorized FixLens AI administrator email addresses.
+ * Administrator authentication strictly validates that any attempting user
+ * matches an authorized identity in this whitelist AND is verified via Supabase Auth.
+ */
+export const ADMIN_EMAILS: readonly string[] = [
+  "adminfix@gmail.com",
+  "adminfixes@gmail.com",
+];
+
+/**
+ * Validates whether an email matches an authorized campus administrator.
+ * Case-insensitive comparison with safe whitespace trimming.
+ */
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return ADMIN_EMAILS.some((adminEmail) => adminEmail.toLowerCase() === normalized);
+}
+
 export interface AdminAuthState {
   isAuthenticated: boolean;
   email?: string;
@@ -51,7 +71,7 @@ export async function getAdminAuthState(): Promise<AdminAuthState> {
     const sessionEmail = user.email?.toLowerCase();
 
     // Verify authenticated user matches designated administrator identity
-    if (!sessionEmail || sessionEmail !== ADMIN_ACCOUNT.email.toLowerCase()) {
+    if (!sessionEmail || !isAdminEmail(sessionEmail)) {
       return { isAuthenticated: false };
     }
 
@@ -83,7 +103,7 @@ export async function getAdminAuthState(): Promise<AdminAuthState> {
       }
     } catch {
       // In case database tables are pending initial SQL migration or offline,
-      // session is verified by valid Supabase Auth session token for ADMIN_ACCOUNT.email
+      // session is verified by valid Supabase Auth session token for an authorized administrator email in ADMIN_EMAILS
     }
 
     return {
@@ -117,10 +137,10 @@ export async function signInAdmin(
   }
 
   // Enforce authorized administrator account identity
-  if (email !== ADMIN_ACCOUNT.email.toLowerCase()) {
+  if (!isAdminEmail(email)) {
     return {
       success: false,
-      error: "Access denied. Only the designated administrator account is permitted to sign in.",
+      error: "Access denied. Only authorized administrator accounts are permitted to sign in.",
     };
   }
 
@@ -230,7 +250,7 @@ export async function getStudentAuthState(): Promise<StudentAuthState> {
     const sessionEmail = user.email.toLowerCase().trim();
 
     // 1. REJECT DESIGNATED ADMINISTRATOR IDENTITY
-    if (sessionEmail === ADMIN_ACCOUNT.email.toLowerCase()) {
+    if (isAdminEmail(sessionEmail)) {
       return { isAuthenticated: false };
     }
 
@@ -317,7 +337,7 @@ export async function signInStudent(
   }
 
   // Pre-check: Block administrator accounts from authenticating via student login
-  if (email === ADMIN_ACCOUNT.email.toLowerCase()) {
+  if (isAdminEmail(email)) {
     return {
       success: false,
       error:
@@ -483,7 +503,7 @@ export async function signUpStudent(input: {
   if (!email) {
     return { success: false, sessionEstablished: false, error: "Please enter your campus email." };
   }
-  if (email === ADMIN_ACCOUNT.email.toLowerCase()) {
+  if (isAdminEmail(email)) {
     return {
       success: false,
       sessionEstablished: false,

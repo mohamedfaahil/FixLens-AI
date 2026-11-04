@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { DemoNotice, PageHeader, Panel } from "@/components/fixlens/ui-bits";
 import { DEMO_ADMIN } from "@/lib/demo-data";
-import { ADMIN_ACCOUNT } from "@/lib/supabase-auth";
+import { ADMIN_ACCOUNT, getAdminAuthState } from "@/lib/supabase-auth";
 import { useDemoStore } from "@/lib/demo-store";
 import { pageHead } from "@/lib/seo";
 
@@ -21,8 +22,22 @@ const perms = [
 
 function Profile() {
   const { isSupabaseConnected } = useDemoStore();
+  const [activeAdminEmail, setActiveAdminEmail] = useState<string>(ADMIN_ACCOUNT.email);
+
+  useEffect(() => {
+    let isMounted = true;
+    getAdminAuthState().then((state) => {
+      if (isMounted && state.email) {
+        setActiveAdminEmail(state.email);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const adminName = isSupabaseConnected ? ADMIN_ACCOUNT.name : DEMO_ADMIN.name;
-  const adminEmail = isSupabaseConnected ? ADMIN_ACCOUNT.email : DEMO_ADMIN.email;
+  const adminEmail = isSupabaseConnected ? activeAdminEmail : DEMO_ADMIN.email;
   const adminRole = isSupabaseConnected ? ADMIN_ACCOUNT.role : DEMO_ADMIN.role;
 
   return (
