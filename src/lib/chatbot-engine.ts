@@ -16,6 +16,7 @@ import {
   type Proposal,
 } from "./demo-data";
 import { predictComplaintPriority, type MLPredictionResult } from "./ml-api";
+import { calculateComplaintSLA, getCampusSLAStats } from "./sla-engine";
 import type { StudentUser } from "./demo-store";
 
 export interface PendingComplaintContext {
@@ -879,34 +880,40 @@ export async function processUserMessage({
       lower.includes("delay") ||
       lower.includes("overdue")
     ) {
-      const now = Date.now();
-      const overdue = complaints.filter((c) => {
-        if (c.status === "Resolved") return false;
-        const ms = new Date(c.date || Date.now()).getTime();
-        return now - ms > 48 * 3600 * 1000;
-      });
+      const stats = getCampusSLAStats(complaints);
+      const overdueTickets = complaints
+        .filter((c) => !["Resolved", "Rejected"].includes(c.status))
+        .map((c) => ({ complaint: c, sla: calculateComplaintSLA(c) }))
+        .filter((item) => item.sla.status === "breached");
 
-      if (overdue.length === 0) {
+      if (overdueTickets.length === 0) {
         return {
           id,
           sender: "bot",
-          text: `Great news! There are currently **no SLA escalations or overdue tickets** in the queue. All facility tickets are progressing within expected timelines.`,
+          text: `Great news! There are currently **no SLA escalations or overdue tickets** in the queue.\n\n` +
+            `• **Campus SLA Compliance:** **${stats.overallComplianceRate}%**\n` +
+            `• **Active On-Track:** ${stats.activeOnTrack} ticket(s)\n` +
+            `• **Approaching Deadline:** ${stats.activeNearBreach} ticket(s)\n\n` +
+            `All facility tickets are progressing within their target resolution windows.`,
           timestamp,
         };
       }
 
-      const overdueList = overdue
+      const overdueList = overdueTickets
         .slice(0, 3)
         .map(
-          (c) =>
-            `• **${c.id}** — *${c.title}* (${c.building}, Priority: ${c.priority}, Status: ${c.status})`,
+          ({ complaint: c, sla }) =>
+            `• **${c.id}** — *${c.title}* (${c.building}, Priority: ${c.priority}, **${sla.badgeText}**)`,
         )
         .join("\n");
 
       return {
         id,
         sender: "bot",
-        text: `⚠️ **Active SLA Escalation Alert**\nFound **${overdue.length} ticket(s)** that have exceeded the standard 48-hour resolution threshold:\n\n${overdueList}\n\nYou can review these in the **Admin Queue** or **Alerts** panel to reassign or expedite dispatch.`,
+        text: `⚠️ **Active SLA Escalation Alert**\nFound **${overdueTickets.length} ticket(s)** that have exceeded institutional SLA thresholds:\n\n${overdueList}\n\n` +
+          `• **Campus SLA Compliance Rate:** **${stats.overallComplianceRate}%**\n` +
+          `• **Approaching Deadline (<25% remaining):** ${stats.activeNearBreach} ticket(s)\n\n` +
+          `You can filter by **"⚠️ Overdue / Breached"** in the **All Complaints** view or check the **Priority Queue** to expedite dispatch.`,
         timestamp,
       };
     }

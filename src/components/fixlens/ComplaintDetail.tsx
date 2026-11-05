@@ -9,6 +9,10 @@ import {
   RotateCcw,
   MessageSquare,
   Link2,
+  Camera,
+  ZoomIn,
+  X,
+  ImageOff,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { Complaint } from "@/lib/demo-data";
@@ -16,6 +20,7 @@ import { useDemoStore } from "@/lib/demo-store";
 import { getRecurrenceForComplaint } from "@/lib/triage-engine";
 import { resolveSignedImageUrl } from "@/lib/supabase-data";
 import { PriorityBadge, StatusBadge, Timeline, formatDate } from "./ui-bits";
+import { SLABadge, SLADetailCard } from "./SLABadge";
 
 export function ComplaintSummary({
   c,
@@ -40,6 +45,9 @@ export function ComplaintSummary({
     return undefined;
   });
 
+  const [imgError, setImgError] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
+
   useEffect(() => {
     if (c.image && !resolvedImage) {
       resolveSignedImageUrl(c.image).then((url) => {
@@ -47,6 +55,25 @@ export function ComplaintSummary({
       });
     }
   }, [c.image]);
+
+  useEffect(() => {
+    if (!isZoomed) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsZoomed(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isZoomed]);
+
+  const displayImageUrl =
+    resolvedImage ||
+    (c.image &&
+    (c.image.startsWith("http://") ||
+      c.image.startsWith("https://") ||
+      c.image.startsWith("data:image/") ||
+      c.image.startsWith("blob:"))
+      ? c.image
+      : undefined);
 
   const reporterDisplay = isSharedView ? "Student Reporter (Protected)" : c.reporter;
 
@@ -81,6 +108,7 @@ export function ComplaintSummary({
         <span className="font-mono text-xs font-semibold text-primary">{c.id}</span>
         <StatusBadge status={c.status} />
         <PriorityBadge priority={c.priority} />
+        <SLABadge complaint={c} />
         {c.linkedComplaintId && (
           <span
             data-testid="linked-complaint-badge"
@@ -136,12 +164,94 @@ export function ComplaintSummary({
           </div>
         ))}
       </dl>
-      {(resolvedImage || c.image) && (
-        <img
-          src={resolvedImage || c.image}
-          alt="Attached by reporter"
-          className="max-h-72 rounded-2xl border border-border object-cover shadow-xs"
-        />
+      <SLADetailCard complaint={c} />
+      {c.image && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Camera className="size-3.5 text-primary" />
+              Attached Campus Photo
+            </span>
+            {displayImageUrl && !imgError && (
+              <button
+                type="button"
+                onClick={() => setIsZoomed(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                <ZoomIn className="size-3.5" />
+                View Full Size
+              </button>
+            )}
+          </div>
+
+          {imgError ? (
+            <div className="flex items-center gap-3 rounded-xl border border-border/80 bg-muted/30 p-4 text-xs text-muted-foreground">
+              <ImageOff className="size-5 shrink-0 text-muted-foreground/70" />
+              <div>
+                <p className="font-semibold text-foreground">Attachment Preview Unavailable</p>
+                <p className="mt-0.5">The image file could not be loaded or was stored in temporary session memory.</p>
+              </div>
+            </div>
+          ) : displayImageUrl ? (
+            <div className="group relative overflow-hidden rounded-2xl border border-border bg-black/5 shadow-xs">
+              <img
+                src={displayImageUrl}
+                alt="Attached by reporter"
+                onError={() => setImgError(true)}
+                onClick={() => setIsZoomed(true)}
+                className="max-h-80 w-auto cursor-zoom-in rounded-2xl object-contain transition-transform duration-200 group-hover:scale-[1.01]"
+              />
+              <div
+                onClick={() => setIsZoomed(true)}
+                className="absolute inset-0 flex cursor-zoom-in items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                <span className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-xs">
+                  <ZoomIn className="size-3.5" />
+                  Click to enlarge
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+              <div className="size-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span>Loading secure photo from storage...</span>
+            </div>
+          )}
+
+          {/* Full-Screen Lightbox Modal */}
+          {isZoomed && displayImageUrl && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in duration-150"
+              onClick={() => setIsZoomed(false)}
+            >
+              <div
+                className="relative max-h-[92vh] max-w-[92vw] overflow-hidden rounded-2xl bg-black/40 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsZoomed(false)}
+                    aria-label="Close enlarged photo"
+                    className="rounded-full bg-black/60 p-2 text-white shadow-md hover:bg-black/90 transition-colors"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+                <img
+                  src={displayImageUrl}
+                  alt="Attached photo enlarged"
+                  className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain"
+                />
+                <div className="border-t border-white/10 bg-black/80 px-4 py-2.5 text-center text-xs text-white/80">
+                  <span>Reported Incident Photo &bull; {c.building} ({c.room || "Campus"})</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
       {c.resolutionNote && (
         <div className="rounded-lg border border-success/25 bg-success/5 p-3 text-sm">

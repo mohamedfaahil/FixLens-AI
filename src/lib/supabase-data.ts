@@ -18,6 +18,36 @@ import type { EscalationAuditRecord } from "./escalation-engine";
 // In-memory cache for resolved signed URLs to avoid duplicate network fetches
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
+/**
+ * Ensures an image URL can be rendered safely in an <img> tag.
+ * Rejects unresolvable raw storage paths (e.g. 'userId/xxx.jpg') to prevent broken image icons.
+ */
+export function toDisplayableImageUrl(resolvedUrl?: string, rawPath?: string | null): string | undefined {
+  if (resolvedUrl && (resolvedUrl.startsWith("http") || resolvedUrl.startsWith("data:") || resolvedUrl.startsWith("blob:"))) {
+    return resolvedUrl;
+  }
+  if (rawPath && (rawPath.startsWith("http") || rawPath.startsWith("data:"))) {
+    return rawPath;
+  }
+  return undefined;
+}
+
+/**
+ * Converts a File object to a Base64 data URL string.
+ */
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof FileReader === "undefined") {
+      resolve("");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 const isTestMode =
   typeof process !== "undefined" &&
   (process.env.NODE_ENV === "test" || process.env.VITEST === "true");
@@ -180,7 +210,7 @@ export async function fetchComplaintsFromSupabase(options: {
             date: c.created_at.slice(0, 10),
             reporter: c.reporter,
             reporterId: c.reporter_id || undefined,
-            image: resolvedImg || c.image_url || undefined,
+            image: toDisplayableImageUrl(resolvedImg, c.image_url),
             resolutionNote: c.resolution_note || undefined,
             linkedComplaintId: c.linked_complaint_id || undefined,
             timeline: timelineMap.get(c.id) || [
@@ -260,7 +290,7 @@ export async function fetchComplaintsFromSupabase(options: {
               date: c.created_at.slice(0, 10),
               reporter: c.reporter,
               reporterId: c.reporter_id || undefined,
-              image: resolvedImg || c.image_url || undefined,
+              image: toDisplayableImageUrl(resolvedImg, c.image_url),
               resolutionNote: c.resolution_note || undefined,
               linkedComplaintId: c.linked_complaint_id || undefined,
               timeline: tlMap.get(c.id) || [
@@ -305,7 +335,7 @@ export async function fetchComplaintsFromSupabase(options: {
                 date: s.created_at.slice(0, 10),
                 reporter: s.reporter || "Campus Resident",
                 reporterId: s.reporter_id || undefined,
-                image: resolvedImg || s.image_url || undefined,
+                image: toDisplayableImageUrl(resolvedImg, s.image_url),
                 linkedComplaintId: s.linked_complaint_id || undefined,
                 timeline: [
                   {
@@ -410,7 +440,7 @@ export async function fetchComplaintByIdFromSupabase(complaintId: string): Promi
         date: c.created_at.slice(0, 10),
         reporter: c.reporter,
         reporterId: c.reporter_id || undefined,
-        image: resolvedImg || c.image_url || undefined,
+        image: toDisplayableImageUrl(resolvedImg, c.image_url),
         resolutionNote: c.resolution_note || undefined,
         linkedComplaintId: c.linked_complaint_id || undefined,
         timeline,
@@ -490,7 +520,7 @@ export async function fetchComplaintByIdFromSupabase(complaintId: string): Promi
           : new Date().toISOString().slice(0, 10),
         reporter: r.reporter || "Campus Resident",
         reporterId: r.reporter_id || undefined,
-        image: resolvedImg || r.image_url || undefined,
+        image: toDisplayableImageUrl(resolvedImg, r.image_url),
         resolutionNote: r.resolution_note || undefined,
         linkedComplaintId: r.linked_complaint_id || undefined,
         timeline,
@@ -527,7 +557,32 @@ export async function createComplaintInSupabase(
     try {
       storedImagePath = await uploadComplaintImage(user.id, imageFile);
     } catch (err) {
-      logError("[Supabase Storage] Image upload failed:", err);
+      logError("[Supabase Storage] Image upload failed, falling back to data URL:", err);
+    }
+  }
+
+  // Determine final image_url:
+  // - If storage upload succeeded: use storedImagePath
+  // - If storage upload failed or was unconfigured: fallback to compressed Base64 Data URL
+  // - Never store a dead 'blob:' URL into the database
+  let finalImageUrl: string | null = null;
+  if (storedImagePath) {
+    finalImageUrl = storedImagePath;
+  } else if (
+    draft.image &&
+    (draft.image.startsWith("data:image/") ||
+      draft.image.startsWith("http://") ||
+      draft.image.startsWith("https://"))
+  ) {
+    finalImageUrl = draft.image;
+  } else if (imageFile) {
+    try {
+      const dataUrl = await fileToDataUrl(imageFile);
+      if (dataUrl && dataUrl.startsWith("data:image/")) {
+        finalImageUrl = dataUrl;
+      }
+    } catch {
+      finalImageUrl = null;
     }
   }
 
@@ -561,7 +616,7 @@ export async function createComplaintInSupabase(
       status: "Submitted",
       reporter: user.name,
       reporter_id: user.id || null,
-      image_url: storedImagePath || draft.image || null,
+      image_url: finalImageUrl,
       linked_complaint_id: draft.linkedComplaintId || null,
     });
 
@@ -599,10 +654,10 @@ export async function createComplaintInSupabase(
     logWarning("[Supabase Data] Notice: timeline insert failed:", err);
   }
 
-  // Resolve signed URL for the newly created complaint preview
+  // Resolve signed URL or displayable data URL for the newly created complaint preview
   const resolvedImg = storedImagePath
     ? await resolveSignedImageUrl(storedImagePath)
-    : draft.image;
+    : (finalImageUrl && (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("http")) ? finalImageUrl : undefined);
 
   return {
     ...draft,
@@ -611,7 +666,7 @@ export async function createComplaintInSupabase(
     date: todayStr,
     reporter: user.name,
     reporterId: user.id || undefined,
-    image: resolvedImg || storedImagePath,
+    image: resolvedImg || (finalImageUrl?.startsWith("data:") ? finalImageUrl : undefined),
     timeline: [
       {
         status: "Submitted",

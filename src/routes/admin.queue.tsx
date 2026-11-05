@@ -9,6 +9,7 @@ import {
   StatusBadge,
   formatDate,
 } from "@/components/fixlens/ui-bits";
+import { SLABadge } from "@/components/fixlens/SLABadge";
 import { useDemoStore } from "@/lib/demo-store";
 import { demoPredictPriority, PRIORITIES, type Priority } from "@/lib/demo-data";
 import { pageHead } from "@/lib/seo";
@@ -88,6 +89,7 @@ function Queue() {
                   <th>Suggested</th>
                   <th>Current</th>
                   <th>Status</th>
+                  <th>SLA Target</th>
                   <th className="text-right">Affected</th>
                 </tr>
               </thead>
@@ -124,6 +126,9 @@ function Queue() {
                     </td>
                     <td>
                       <StatusBadge status={c.status} />
+                    </td>
+                    <td>
+                      <SLABadge complaint={c} />
                     </td>
                     <td className="text-right font-medium">{c.affected}</td>
                   </tr>

@@ -12,7 +12,13 @@ import {
   CheckSquare,
   Square,
   CornerDownRight,
+  Camera,
+  UploadCloud,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
+import { CameraCaptureModal } from "@/components/fixlens/CameraCaptureModal";
+import { compressImage, formatFileSize } from "@/lib/image-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +74,9 @@ function Report() {
   const [f, setF] = useState(() => reportDraft || empty);
   const [img, setImg] = useState<string | undefined>(() => reportDraft?.image);
   const [selectedFile, setSelectedFile] = useState<File | undefined>(() => reportDraft?.imageFile);
+  const [fileMetadata, setFileMetadata] = useState<{ name: string; size: number } | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [isSeparateIncidentConfirmed, setIsSeparateIncidentConfirmed] = useState(false);
 
   // Sync draft if updated by Copilot action
@@ -270,18 +279,60 @@ function Report() {
     }
   };
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/"))
-      return setErr({ ...err, image: "Please choose an image file." });
-    if (file.size > 5 * 1024 * 1024) return setErr({ ...err, image: "Image must be under 5 MB." });
+    if (!file.type.startsWith("image/")) {
+      return setErr({ ...err, image: "Please choose an image file (PNG, JPG, or WEBP)." });
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      return setErr({ ...err, image: "Image must be under 15 MB." });
+    }
     setErr({ ...err, image: "" });
-    setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setImg(url);
-    setReportDraft({ ...f, image: url, imageFile: file });
+    setIsCompressing(true);
+    try {
+      const result = await compressImage(file, 1280, 0.78);
+      setImg(result.dataUrl);
+      setSelectedFile(result.file);
+      setFileMetadata({ name: file.name, size: result.sizeBytes });
+      setReportDraft({ ...f, image: result.dataUrl, imageFile: result.file });
+      toast.success("Photo selected and optimized.");
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setImg(dataUrl);
+        setSelectedFile(file);
+        setFileMetadata({ name: file.name, size: file.size });
+        setReportDraft({ ...f, image: dataUrl, imageFile: file });
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+      e.target.value = "";
+    }
   };
+
+  const handleCameraCapture = (file: File, dataUrl: string) => {
+    setErr({ ...err, image: "" });
+    setImg(dataUrl);
+    setSelectedFile(file);
+    setFileMetadata({ name: file.name || "camera_capture.jpg", size: file.size });
+    setReportDraft({ ...f, image: dataUrl, imageFile: file });
+    setIsCameraOpen(false);
+    toast.success("Photo captured and attached.");
+  };
+
+  const handleRemoveImage = () => {
+    setImg(undefined);
+    setSelectedFile(undefined);
+    setFileMetadata(null);
+    setErr({ ...err, image: "" });
+    setReportDraft({ ...f, image: undefined, imageFile: undefined });
+    toast.info("Photo removed.");
+  };
+
+  const onFile = handleFileUpload;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,7 +414,7 @@ function Report() {
           urgency: f.urgency, // Student reported urgency preserved separately
           affected: n,
           priority: finalPred.priority, // Suggested by trained ML model
-          image: img,
+          image: img || undefined,
           linkedComplaintId: resolvedSameStudentRepeat
             ? resolvedSameStudentRepeat.complaint.id
             : undefined,
@@ -375,11 +426,14 @@ function Report() {
           isTrainedModel: finalPred.isTrainedModel,
           signals: finalPred.signals,
         },
-        selectedFile,
+        img ? selectedFile : undefined,
       );
 
       // Only clear draft and display success once database insert has succeeded
       setReportDraft(null);
+      setImg(undefined);
+      setSelectedFile(undefined);
+      setFileMetadata(null);
       setIsSeparateIncidentConfirmed(false);
       setDone(c);
       toast.success("Complaint submitted successfully.");
@@ -580,37 +634,136 @@ function Report() {
               </div>
             </fieldset>
             <div>
-              <p className="mb-2 text-sm font-semibold text-foreground">Photo Attachment (optional)</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">Photo Evidence (Optional)</p>
+                {img && (
+                  <span className="text-xs text-muted-foreground">
+                    1 photo attached &bull; Only posted if attached
+                  </span>
+                )}
+              </div>
+
               {img ? (
-                <div className="relative inline-block">
-                  <img
-                    src={img}
-                    alt="Attachment preview"
-                    className="h-44 rounded-xl border border-border object-cover shadow-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setImg(undefined)}
-                    aria-label="Remove image"
-                    className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-full bg-card/90 backdrop-blur-xs text-foreground shadow-card hover:bg-card hover:text-destructive transition-colors"
-                  >
-                    <X className="size-4" />
-                  </button>
+                /* Attached Photo Preview Card */
+                <div
+                  data-testid="attached-photo-preview"
+                  className="relative overflow-hidden rounded-2xl border border-primary/30 bg-primary/[0.03] p-4 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="relative shrink-0 overflow-hidden rounded-xl border border-border bg-black/10">
+                      <img
+                        src={img}
+                        alt="Issue attachment"
+                        className="h-28 w-36 object-cover rounded-xl"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {fileMetadata?.name || "campus_photo.jpg"}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-foreground">
+                          {fileMetadata?.size ? formatFileSize(fileMetadata.size) : "Optimized"}
+                        </span>
+                        <span>Client-compressed JPEG &bull; Ready to submit</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        This photo will be attached to your complaint and visible to campus administrators.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsCameraOpen(true)}
+                        className="gap-1.5 text-xs"
+                      >
+                        <RefreshCw className="size-3.5" />
+                        Retake
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        aria-label="Remove photo"
+                        className="gap-1.5 text-xs"
+                      >
+                        <Trash2 className="size-3.5" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <label className="flex cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed border-border/80 bg-card/40 py-8 text-sm text-muted-foreground transition-all duration-150 hover:border-primary/60 hover:bg-primary/[0.02]">
-                  <div className="grid size-12 place-items-center rounded-xl bg-muted/60 text-primary mb-2">
-                    <ImagePlus className="size-6" />
-                  </div>
-                  <span className="font-medium text-foreground">Click or drop to attach a photo</span>
-                  <span className="mt-0.5 text-xs text-muted-foreground">PNG, JPG, or WEBP up to 5 MB</span>
-                  <input type="file" accept="image/*" className="sr-only" onChange={onFile} />
-                </label>
+                /* Dual Option Grid: Direct Camera & File Upload */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Direct Camera */}
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraOpen(true)}
+                    className="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-card/50 p-6 text-center transition-all duration-200 hover:border-primary hover:bg-primary/[0.03] hover:shadow-sm"
+                  >
+                    <div className="mb-3 grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-110">
+                      <Camera className="size-6" />
+                    </div>
+                    <span className="text-sm font-bold text-foreground">Take Photo (Camera)</span>
+                    <span className="mt-1 text-xs text-muted-foreground">
+                      Capture live photo using device webcam or phone camera
+                    </span>
+                    <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                      Open Camera &rarr;
+                    </span>
+                  </button>
+
+                  {/* Option 2: Upload from Device */}
+                  <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-card/50 p-6 text-center transition-all duration-200 hover:border-primary hover:bg-primary/[0.03] hover:shadow-sm">
+                    <div className="mb-3 grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground transition-transform duration-200 group-hover:scale-110 group-hover:text-primary group-hover:bg-primary/10">
+                      <UploadCloud className="size-6" />
+                    </div>
+                    <span className="text-sm font-bold text-foreground">Upload from Device</span>
+                    <span className="mt-1 text-xs text-muted-foreground">
+                      Browse gallery or files (PNG, JPG, WEBP up to 15 MB)
+                    </span>
+                    <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                      Browse Files &rarr;
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={isCompressing}
+                      onChange={handleFileUpload}
+                    />
+                  </label>
+                </div>
               )}
+
+              {isCompressing && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                  <span>Optimizing photo resolution and compressing size...</span>
+                </div>
+              )}
+
               <FieldError msg={err.image} />
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Stored securely in the private complaint-images bucket.
+                Photo will only be posted if attached above. Photos are optimized client-side for rapid administrative triage.
               </p>
+
+              {/* Direct Camera Modal */}
+              <CameraCaptureModal
+                isOpen={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={handleCameraCapture}
+              />
             </div>
 
             {/* Same student active repeat submission warning */}

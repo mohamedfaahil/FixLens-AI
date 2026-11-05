@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Download, CheckCircle2, ClipboardList, Flame, Hourglass } from "lucide-react";
+import { AlertTriangle, Download, CheckCircle2, ClipboardList, Flame, Hourglass, Clock } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -18,6 +18,7 @@ import {
 import { useDemoStore } from "@/lib/demo-store";
 import { CATEGORIES } from "@/lib/demo-data";
 import { detectRecurringIssues } from "@/lib/triage-engine";
+import { getCampusSLAStats } from "@/lib/sla-engine";
 import { Panel, PriorityBadge, formatDate, selectCls } from "./ui-bits";
 import { Button } from "@/components/ui/button";
 import { exportAnalyticsSummaryToCSV } from "@/lib/csv-export";
@@ -117,6 +118,9 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
   const activeAnomalies = useMemo(() => {
     return (adminAlerts || []).filter((a) => !cat || a.category === cat);
   }, [adminAlerts, cat]);
+
+  // Real-time institutional SLA performance metrics
+  const slaStats = useMemo(() => getCampusSLAStats(filtered), [filtered]);
 
   const tip = {
     contentStyle: {
@@ -324,6 +328,90 @@ export function AnalyticsView({ compact }: { compact?: boolean }) {
           </p>
         )}
       </Panel>
+
+      {/* SLA Performance & Institutional Compliance Panel */}
+      {!compact && (
+        <Panel
+          title={
+            <span className="flex items-center gap-2">
+              <Clock className="size-4 text-primary" /> SLA Compliance & Turnaround Performance
+            </span>
+          }
+        >
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Overall Compliance</p>
+              <p className="mt-1.5 font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {slaStats.overallComplianceRate}%
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Resolved within target window</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active SLA Breaches</p>
+              <p className={`mt-1.5 font-display text-2xl font-bold ${slaStats.activeOverdue > 0 ? "text-destructive" : "text-foreground"}`}>
+                {slaStats.activeOverdue}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Open tickets exceeding SLA limit</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approaching Deadline</p>
+              <p className={`mt-1.5 font-display text-2xl font-bold ${slaStats.activeNearBreach > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
+                {slaStats.activeNearBreach}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">&lt;25% window remaining</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Avg. Turnaround Time</p>
+              <p className="mt-1.5 font-display text-2xl font-bold text-primary">
+                {slaStats.avgResolutionHours}h
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Across completed tickets</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3.5 border-t border-border/60">
+            <p className="text-xs font-semibold text-muted-foreground mb-2.5">Priority SLA Target Compliance</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium text-foreground">High Priority (24h)</span>
+                  <span className="font-bold text-foreground">{slaStats.highPriorityComplianceRate}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500 rounded-full transition-all duration-300"
+                    style={{ width: `${slaStats.highPriorityComplianceRate}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium text-foreground">Medium Priority (48h)</span>
+                  <span className="font-bold text-foreground">{slaStats.mediumPriorityComplianceRate}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                    style={{ width: `${slaStats.mediumPriorityComplianceRate}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium text-foreground">Low Priority (120h)</span>
+                  <span className="font-bold text-foreground">{slaStats.lowPriorityComplianceRate}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                    style={{ width: `${slaStats.lowPriorityComplianceRate}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {!compact && (
         <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
