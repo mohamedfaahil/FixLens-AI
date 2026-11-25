@@ -9,6 +9,7 @@ import {
   signInStudent,
   resendStudentConfirmationEmail,
   getStudentAuthState,
+  formatAuthErrorMessage,
 } from "@/lib/supabase-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageHead } from "@/lib/seo";
@@ -163,7 +164,7 @@ export function Login() {
       setErr({ password: res.error || "Invalid campus credentials." });
       toast.error(res.error || "Authentication failed.");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Sign in failed.";
+      const message = formatAuthErrorMessage(error);
       setErr({ password: message });
       toast.error(message);
     } finally {

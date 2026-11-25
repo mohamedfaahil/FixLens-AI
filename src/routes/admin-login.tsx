@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AuthLayout, PasswordField, TextField } from "@/components/fixlens/AuthLayout";
 import { AdminAside } from "@/components/fixlens/AuthAside";
-import { signInAdmin } from "@/lib/supabase-auth";
+import { signInAdmin, formatAuthErrorMessage } from "@/lib/supabase-auth";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/admin-login")({
@@ -89,8 +89,8 @@ export function AdminLogin() {
       }
       toast.success("Administrator authenticated with Supabase. Access granted.");
       nav({ to: "/admin" });
-    } catch {
-      toast.error("Failed to authenticate administrator.");
+    } catch (err: unknown) {
+      toast.error(formatAuthErrorMessage(err));
     } finally {
       setBusy(false);
     }

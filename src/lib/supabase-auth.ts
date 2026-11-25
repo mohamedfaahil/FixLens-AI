@@ -52,6 +52,31 @@ export interface StudentAuthState {
 }
 
 /**
+ * Translates low-level browser network errors (like 'Failed to fetch' when a Supabase project is paused)
+ * into actionable, user-friendly guidance.
+ */
+export function formatAuthErrorMessage(error: unknown): string {
+  if (!error) return "Authentication failed.";
+  const rawMsg =
+    typeof error === "string"
+      ? error
+      : (error as { message?: string }).message || "Authentication failed.";
+
+  const lower = rawMsg.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("fetch failed") ||
+    lower.includes("load failed") ||
+    lower.includes("network request failed")
+  ) {
+    return "Database server unreachable. Your Supabase project may be paused due to inactivity. Please restore it in the Supabase dashboard (https://supabase.com/dashboard).";
+  }
+
+  return rawMsg;
+}
+
+/**
  * Checks if the administrator is currently authenticated.
  * Verifies the live Supabase Auth session token and validates the administrator role.
  * Does not trust unverified browser storage flags.
@@ -154,7 +179,7 @@ export async function signInAdmin(
     if (error) {
       return {
         success: false,
-        error: error.message || "Invalid administrator credentials.",
+        error: formatAuthErrorMessage(error),
       };
     }
 
@@ -205,8 +230,7 @@ export async function signInAdmin(
 
     return { success: true, user: data.user };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to connect to authentication server.";
-    return { success: false, error: message };
+    return { success: false, error: formatAuthErrorMessage(err) };
   }
 }
 
@@ -360,7 +384,7 @@ export async function signInStudent(
         success: false,
         error: isEmailUnconfirmed
           ? "Your email has not been confirmed yet. Please verify your email before logging in."
-          : error.message || "Invalid credentials.",
+          : formatAuthErrorMessage(error),
         isEmailUnconfirmed,
       };
     }
@@ -436,8 +460,7 @@ export async function signInStudent(
       },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to connect to authentication server.";
-    return { success: false, error: message };
+    return { success: false, error: formatAuthErrorMessage(err) };
   }
 }
 
