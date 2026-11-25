@@ -94,8 +94,10 @@ describe("FixLens AI — Feature A: Priority Escalation Engine", () => {
   });
 
   it("does NOT escalate merely because the same student submits repeated follow-ups", () => {
+    const todayStr = new Date().toISOString().slice(0, 10);
     const singleComplaint = createMockComplaint({
       id: "FX-FU-1",
+      date: todayStr,
       title: "Chair leg wobbly in CS 201",
       description: "Back left leg of chair is loose.",
       category: "Furniture",
@@ -103,9 +105,9 @@ describe("FixLens AI — Feature A: Priority Escalation Engine", () => {
       urgency: "Low",
       reporter: "Same Student",
       followUps: [
-        { id: "FU-1", content: "Still loose.", date: "2026-11-01", timestamp: "10:00", by: "Same Student" },
-        { id: "FU-2", content: "Any updates?", date: "2026-11-01", timestamp: "12:00", by: "Same Student" },
-        { id: "FU-3", content: "Still waiting.", date: "2026-11-01", timestamp: "14:00", by: "Same Student" },
+        { id: "FU-1", content: "Still loose.", date: todayStr, timestamp: "10:00", by: "Same Student" },
+        { id: "FU-2", content: "Any updates?", date: todayStr, timestamp: "12:00", by: "Same Student" },
+        { id: "FU-3", content: "Still waiting.", date: todayStr, timestamp: "14:00", by: "Same Student" },
       ],
     });
 
