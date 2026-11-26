@@ -23,6 +23,7 @@ import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 import { Route as AdminQueueRouteImport } from './routes/admin.queue'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as StudentIndexRouteImport } from './routes/student.index'
+import { Route as StudentFeedbackRouteImport } from './routes/student.feedback'
 import { Route as StudentImprovementsRouteImport } from './routes/student.improvements'
 import { Route as StudentProfileRouteImport } from './routes/student.profile'
 import { Route as StudentReportRouteImport } from './routes/student.report'
@@ -101,6 +102,11 @@ const StudentIndexRoute = StudentIndexRouteImport.update({
   path: '/',
   getParentRoute: () => StudentRoute,
 } as any)
+const StudentFeedbackRoute = StudentFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => StudentRoute,
+} as any)
 const StudentImprovementsRoute = StudentImprovementsRouteImport.update({
   id: '/improvements',
   path: '/improvements',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/admin/profile': typeof AdminProfileRoute
   '/admin/queue': typeof AdminQueueRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/student/feedback': typeof StudentFeedbackRoute
   '/student/improvements': typeof StudentImprovementsRoute
   '/student/profile': typeof StudentProfileRoute
   '/student/report': typeof StudentReportRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/admin/profile': typeof AdminProfileRoute
   '/admin/queue': typeof AdminQueueRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/student/feedback': typeof StudentFeedbackRoute
   '/student/improvements': typeof StudentImprovementsRoute
   '/student/profile': typeof StudentProfileRoute
   '/student/report': typeof StudentReportRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/admin/profile': typeof AdminProfileRoute
   '/admin/queue': typeof AdminQueueRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/student/feedback': typeof StudentFeedbackRoute
   '/student/improvements': typeof StudentImprovementsRoute
   '/student/profile': typeof StudentProfileRoute
   '/student/report': typeof StudentReportRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/queue'
     | '/admin/reports'
+    | '/student/feedback'
     | '/student/improvements'
     | '/student/profile'
     | '/student/report'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/queue'
     | '/admin/reports'
+    | '/student/feedback'
     | '/student/improvements'
     | '/student/profile'
     | '/student/report'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/queue'
     | '/admin/reports'
+    | '/student/feedback'
     | '/student/improvements'
     | '/student/profile'
     | '/student/report'
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentIndexRouteImport
       parentRoute: typeof StudentRoute
     }
+    '/student/feedback': {
+      id: '/student/feedback'
+      path: '/feedback'
+      fullPath: '/student/feedback'
+      preLoaderRoute: typeof StudentFeedbackRouteImport
+      parentRoute: typeof StudentRoute
+    }
     '/student/improvements': {
       id: '/student/improvements'
       path: '/improvements'
@@ -463,6 +482,7 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface StudentRouteChildren {
+  StudentFeedbackRoute: typeof StudentFeedbackRoute
   StudentImprovementsRoute: typeof StudentImprovementsRoute
   StudentProfileRoute: typeof StudentProfileRoute
   StudentReportRoute: typeof StudentReportRoute
@@ -472,6 +492,7 @@ interface StudentRouteChildren {
 }
 
 const StudentRouteChildren: StudentRouteChildren = {
+  StudentFeedbackRoute: StudentFeedbackRoute,
   StudentImprovementsRoute: StudentImprovementsRoute,
   StudentProfileRoute: StudentProfileRoute,
   StudentReportRoute: StudentReportRoute,

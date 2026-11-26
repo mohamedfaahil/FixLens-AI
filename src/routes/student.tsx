@@ -8,6 +8,7 @@ import {
   UserRound,
   Loader2,
   ShieldAlert,
+  MessageSquareHeart,
 } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/fixlens/PortalShell";
 import { useDemoStore } from "@/lib/demo-store";
@@ -24,6 +25,7 @@ const nav: NavItem[] = [
   { to: "/student/report", label: "Report Complaint", icon: FilePlus2 },
   { to: "/student/complaints", label: "My Complaints", icon: ClipboardList },
   { to: "/student/improvements", label: "Campus Improvement Hub", icon: Lightbulb },
+  { to: "/student/feedback", label: "Student Feedback", icon: MessageSquareHeart },
   { to: "/student/profile", label: "Profile", icon: UserRound },
 ];
 
